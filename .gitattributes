@@ -1,0 +1,14 @@
+# Text files: LF in the repo, CRLF in the Windows working tree.
+* text=auto eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.sqlite binary
+*.sqlite-wal binary
+*.sqlite-shm binary
