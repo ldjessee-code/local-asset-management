@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Asset Management</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <a class="skip" href="#main-controls" data-i18n="skip_to_controls">Skip to controls</a>
+
+  <div class="app-grid">
+    <aside class="pane" id="col-left" aria-label="Session">
+      <div class="pane-bar" id="left-bar">
+        <button type="button" id="toggle-left-bar" class="ghost" data-i18n-aria="expand_session" aria-expanded="false">»</button>
+        <strong data-i18n="app_name">Local Asset Management</strong>
+        <span id="bar-url" class="mono"></span>
+        <span id="bar-scan"></span>
+      </div>
+      <div id="session-body" class="collapsible">
+      <button type="button" id="toggle-left" class="ghost" data-i18n-aria="collapse_session" aria-expanded="true" aria-controls="session-body">«</button>
+        <div class="brand">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" role="img" aria-hidden="true">
+            <rect x="6" y="8" width="12" height="24" rx="1.5" fill="currentColor" opacity="0.85"/>
+            <rect x="20" y="8" width="14" height="24" rx="1.5" fill="currentColor"/>
+            <path d="M18 8v24" stroke="var(--bg)" stroke-width="2"/>
+          </svg>
+          <div>
+            <p class="eyebrow" data-i18n="app_name">Local Asset Management</p>
+            <h1 id="app-title" data-i18n="app_name">Local Asset Management</h1>
+            <p class="muted" id="version"></p>
+          </div>
+        </div>
+
+        <div id="auth-card" hidden>
+          <h2 data-i18n="token">Token</h2>
+          <p class="lede" data-i18n="token_help">From the terminal Token: line, or the UI: link.</p>
+          <form id="token-form" class="row">
+            <input id="token-input" type="password" autocomplete="off" data-i18n-aria="token">
+            <button type="submit" data-i18n="save_token">Save token</button>
+          </form>
+          <p id="auth-error" class="error" hidden></p>
+        </div>
+
+        <p class="muted" id="bound-url"></p>
+        <p><span class="pill idle" id="job-pill" data-i18n="job_idle">idle</span></p>
+        <p>
+          <span data-i18n="last_scan">Last scan</span>:
+          <time id="last-scan" datetime="">—</time>
+        </p>
+        <p id="stale-warning" class="error" hidden data-i18n="scan_stale">This listing may be out of date. Scan again to refresh.</p>
+
+        <h2 id="messages-heading" data-i18n="messages">Messages</h2>
+        <div class="chat" id="messages" role="log" aria-live="polite" aria-relevant="additions" aria-labelledby="messages-heading">
+          <div class="msg" id="msg-placeholder"><span data-i18n="messages_placeholder">This listing may be out of date. Scan again to refresh.</span></div>
+        </div>
+
+        <label class="field">
+          <span data-i18n="theme">Color scheme</span>
+          <select id="theme-select" data-i18n-aria="theme">
+            <option value="night" data-i18n="theme_night">Night</option>
+            <option value="day" data-i18n="theme_day">Day</option>
+            <option value="deuteranopia" data-i18n="theme_deuteranopia">Blue-green color blind</option>
+            <option value="protanopia" data-i18n="theme_protanopia">Red color blind</option>
+            <option value="achromatopsia" data-i18n="theme_achromatopsia">Gray (no color)</option>
+            <option value="high-contrast" data-i18n="theme_high_contrast">High contrast</option>
+          </select>
+        </label>
+        <label class="field">
+          <span data-i18n="language">Language</span>
+          <select id="lang-select" data-i18n-aria="language">
+            <option value="en">English</option>
+          </select>
+        </label>
+        <p class="lede" data-i18n="safety">Scan is read-only. Apply copies; it does not delete sources.</p>
+        <p class="btn-row">
+          <button type="button" id="stop-server" class="danger" data-i18n="stop">Stop</button>
+        </p>
+        <p class="muted">
+          <a href="/license" data-i18n="license">License</a> ·
+          <a href="https://github.com/ldjessee-code/local-asset-management" data-i18n="source_code">Source</a>
+        </p>
+      </div>
+    </aside>
+
+    <main class="pane" id="main-controls">
+      <section id="setup-card" hidden>
+        <h2 data-i18n="setup_title">Set up this library</h2>
+        <p class="lede" data-i18n="setup_lede">Save library.jsonc outside sources and the destination. Then add folders.</p>
+        <h3 data-i18n="open_config">Open an existing file</h3>
+        <div class="row">
+          <input id="load-path" type="text" data-i18n-aria="open_config">
+          <button type="button" id="load-config" class="ghost" data-i18n="open_config">Open</button>
+        </div>
+        <h3 data-i18n="create_config">Or create one</h3>
+        <label class="field">
+          <span data-i18n="save_config_as">Save config as</span>
+          <input id="save-path" type="text" data-i18n-aria="save_config_as">
+        </label>
+        <label class="field">
+          <span data-i18n="output_folder">Output folder</span>
+          <input id="output-folder" type="text" data-i18n-aria="output_folder">
+        </label>
+        <label class="field">
+          <span data-i18n="quarantine">Quarantine</span>
+          <input id="quarantine-path" type="text" data-i18n-aria="quarantine">
+        </label>
+        <h3 data-i18n="source_folders">Source folders</h3>
+        <div id="source-rows"></div>
+        <p class="btn-row">
+          <button type="button" id="add-source" class="ghost" data-i18n="add_source">Add source</button>
+        </p>
+        <p class="btn-row">
+          <button type="button" id="check-setup" class="ghost" data-i18n="check_paths">Check paths</button>
+          <button type="button" id="save-setup" data-i18n="save_and_use">Save and use</button>
+        </p>
+        <p id="setup-msg" class="muted" role="status"></p>
+      </section>
+
+      <section class="jobs-only">
+        <p class="btn-row toolbar">
+          <button type="button" id="change-setup" data-i18n="plan_settings">Plan settings</button>
+          <button type="button" data-job="scan" class="primary" data-i18n="scan">Scan</button>
+          <button type="button" id="deep-scan" data-i18n="deep_scan">Deep scan</button>
+          <button type="button" data-job="plan" data-i18n="plan">Plan</button>
+          <button type="button" id="apply-btn" data-i18n="apply">Apply</button>
+        </p>
+        <label class="confirm" for="apply-confirm">
+          <input type="checkbox" id="apply-confirm">
+          <span data-i18n="confirm_apply">I reviewed the duplicates and want to copy files</span>
+        </label>
+        <div class="progress-wrap" aria-hidden="true"><div id="progress-bar"></div></div>
+        <h2 data-i18n="duplicates">Duplicates</h2>
+        <p class="legend">
+          <span class="swatch-unique" data-i18n="unique">Only here</span>
+          <span class="swatch-dup" data-i18n="dup_meta">Same name, date, and size</span>
+          <span class="swatch-mismatch" data-i18n="dup_meta_diff">Same name, date, and size — different contents</span>
+          <span class="swatch-lib" data-i18n="in_library">Already in library</span>
+        </p>
+        <div id="dup-headers" class="dup-grid"></div>
+        <div class="dup-wrap">
+          <div id="dup-grid" class="dup-grid" role="table" aria-label="Duplicates"></div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="pane jobs-only" id="col-right" aria-label="Library trees">
+      <div class="pane-bar" id="right-bar">
+        <button type="button" id="toggle-right-bar" class="ghost" data-i18n-aria="expand_library">»</button>
+        <span data-i18n="space_to_save">Space you could save</span>
+        <strong id="space-to-save-bar">—</strong>
+      </div>
+      <div class="collapsible" id="library-body">
+      <p class="heading-row">
+        <button type="button" id="toggle-right" class="ghost" data-i18n-aria="collapse_library">«</button>
+      </p>
+      <h2 data-i18n="space_to_save">Space you could save</h2>
+      <p id="space-to-save" class="mono">—</p>
+      <p id="zip-pairing" class="muted"></p>
+      <div class="heading-row">
+        <h2 data-i18n="sources">Sources</h2>
+        <button type="button" id="add-source-inline" class="ghost" data-i18n-aria="add_source_plus" title="+">+</button>
+      </div>
+      <form id="add-source-form" class="row" hidden>
+        <input id="add-source-path" type="text" data-i18n-aria="source_path">
+        <button type="submit" data-i18n="save">Save</button>
+      </form>
+      <div id="source-trees" class="tree"></div>
+      <div class="heading-row">
+        <h2><button type="button" class="linkish" id="edit-dest" data-i18n="destination">Destination</button></h2>
+      </div>
+      <p id="dest-path" class="mono"></p>
+      <form id="dest-form" class="row" hidden>
+        <input id="dest-input" type="text" data-i18n-aria="edit_destination">
+        <button type="submit" data-i18n="save">Save</button>
+      </form>
+      <div id="dest-tree" class="tree"></div>
+      <div class="heading-row">
+        <h2><button type="button" class="linkish" id="edit-quarantine" data-i18n="quarantine">Quarantine</button></h2>
+      </div>
+      <p id="quarantine-path-label" class="mono"></p>
+      <form id="quarantine-form" class="row" hidden>
+        <input id="quarantine-input" type="text" data-i18n-aria="edit_quarantine">
+        <button type="submit" data-i18n="save">Save</button>
+      </form>
+      <div id="quarantine-tree" class="tree"></div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="/static/js/i18n.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

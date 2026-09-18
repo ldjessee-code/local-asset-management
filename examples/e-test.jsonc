@@ -1,0 +1,38 @@
+{
+  // Example two-folder PNG test. Copy to library.jsonc outside sources
+  // and the destination, then edit paths.
+
+  "profile": "spacious",
+
+  "sources": [
+    {
+      "path": "E:/test_images",
+      "layout": "keep_relpath",
+      "priority": 30
+    },
+    {
+      "path": "E:/test_pics",
+      "layout": "keep_relpath",
+      "priority": 10
+    }
+  ],
+
+  "library_root": "E:/test_out/media",
+  "quarantine": "E:/test_out/_quarantine",
+  "index_db": "E:/test_out/index/library.sqlite",
+  "log_dir": "E:/test_out/logs",
+  "reports_dir": "E:/test_out/reports",
+
+  "apply": {
+    "default_op": "copy",
+    "never_modify_sources": true,
+    "quarantine_exact_dupes": true
+  },
+
+  "hash_workers": 4,
+
+  "serve": {
+    "host": "127.0.0.1",
+    "port": 8765
+  }
+}

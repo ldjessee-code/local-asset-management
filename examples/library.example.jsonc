@@ -1,0 +1,83 @@
+{
+  // Copy this file and point paths at *your* disks.
+  // apply still needs --yes / UI confirm. Optional protect_paths blocks
+  // extra drives or folders from being written.
+
+  // spacious = copy into library, leave sources alone
+  // tight    = hardlink on same volume when possible
+  "profile": "spacious",
+
+  "sources": [
+    {
+      "path": "D:/Screenshots",
+      "layout": "by_year",
+      "priority": 10
+    },
+    {
+      "path": "D:/Patreon",
+      "layout": "pack_tree",
+      "priority": 50
+    },
+    {
+      "path": "D:/VTT/working",
+      "layout": "pack_tree",
+      "priority": 20
+    },
+    {
+      "path": "D:/Downloads/art",
+      "layout": "keep_relpath",
+      "priority": 5
+    }
+  ],
+
+  "quarantine": "D:/Library/_quarantine",
+  "library_root": "D:/Library/media",
+  "index_db": "D:/Library/index/library.sqlite",
+  "log_dir": "D:/Library/logs",
+  "reports_dir": "D:/Library/reports",
+
+  "groups": {
+    "images": [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"],
+    "sidecars": [".txt", ".md", ".pdf", ".docx", ".nfo", ".json", ".html", ".url"],
+    "archives": [".zip"],
+    "archives_optional": [".7z", ".rar"]
+  },
+
+  "layout": {
+    "keep_relpath": "{library_root}/{source_name}/{relpath}",
+    "by_year": "{library_root}/screenshots/{year}/{stem}{ext}",
+    "by_year_month": "{library_root}/photos/{year}/{month}/{stem}{ext}",
+    "pack_tree": "{library_root}/packs/{bundle}/{pack}/{relpath_from_pack}",
+    "by_ext": "{library_root}/by-ext/{ext_name}/{stem}{ext}",
+    "sidecar_with_parent": "{parent_dir}/_notes/{stem}{ext}",
+    "zip_store": "{library_root}/_zips/{bundle}/{zip_name}"
+  },
+
+  "exclude_dir_names": ["node_modules", ".git", "__MACOSX", ".DS_Store"],
+
+  "zip": {
+    "index_nested": true,
+    "extract_on_apply": false,
+    "max_depth": 2
+  },
+
+  "helpers": {
+    "fclones": "auto"
+  },
+
+  "apply": {
+    "default_op": "copy",
+    "never_modify_sources": true,
+    "quarantine_exact_dupes": true
+  },
+
+  // Extra roots apply will not write into (library_root and quarantine stay allowed).
+  "protect_paths": [],
+
+  "hash_workers": 4,
+
+  "serve": {
+    "host": "127.0.0.1",
+    "port": 8765
+  }
+}

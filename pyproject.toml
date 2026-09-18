@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-asset-management"
+version = "0.1.0"
+description = "Multi-source local file librarian: inventory, exact-dedupe, layout, quarantine."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "AGPL-3.0-or-later" }
+authors = [{ name = "ldjessee-code" }]
+keywords = ["librarian", "dedupe", "assets", "index"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Environment :: Web Environment",
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: System :: Archiving",
+]
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.32.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+archive-7z = ["py7zr"]
+archive-rar = ["rarfile"]
+
+[project.urls]
+Homepage = "https://github.com/ldjessee-code/local-asset-management"
+Source = "https://github.com/ldjessee-code/local-asset-management"
+Documentation = "https://github.com/ldjessee-code/local-asset-management/blob/main/docs/architecture.md"
+License = "https://github.com/ldjessee-code/local-asset-management/blob/main/LICENSE"
+Commercial = "https://github.com/ldjessee-code/local-asset-management/blob/main/COMMERCIAL.md"
+
+[project.scripts]
+lam = "lam.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lam*"]
+
+[tool.setuptools.package-data]
+lam = ["web/static/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"

@@ -1,0 +1,12 @@
+include LICENSE
+include COMMERCIAL.md
+include README.md
+include AGENTS.md
+include library-index-spec.md
+include start.py
+include start.cmd
+include start.ps1
+include start.sh
+recursive-include docs *
+recursive-include lam/web/static *
+recursive-include examples *

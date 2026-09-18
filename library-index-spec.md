@@ -3,12 +3,13 @@
 Generic multi-source file librarian: inventory, exact-dedupe, archive pairing,
 configurable physical layout, quarantine. Not tied to a VTT or photo app.
 
-Primary use case on this machine: game screenshots + tabletop map/token packs
+Primary use case: game screenshots + tabletop map/token packs
 (often Patreon zips, used in Roll20). Same tool + a different config covers
 spreadsheets, zip-only archives, or a photo library.
 
-Status: design. Do not scan a real drive from the agent workspace.
-Run the finished tool on the Windows box (8 TB library drive).
+Status: design. Tests use fixtures. Live disks are only those the operator
+puts in config. Writes (`apply`) need explicit approval. Optional
+`protect_paths` lists drives or folders that must not be modified.
 
 Supersedes `vtt-asset-index-spec.md`.
 

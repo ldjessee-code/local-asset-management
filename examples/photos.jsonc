@@ -1,0 +1,31 @@
+{
+  // Camera / phone dumps → year/month folders.
+  // Copy to library.jsonc outside the destination, then edit paths.
+
+  "profile": "spacious",
+
+  "sources": [
+    {
+      "path": "D:/Camera",
+      "layout": "by_year_month",
+      "priority": 40
+    },
+    {
+      "path": "D:/Phone/DCIM",
+      "layout": "by_year_month",
+      "priority": 20
+    }
+  ],
+
+  "library_root": "D:/Photos/media",
+  "quarantine": "D:/Photos/_quarantine",
+  "index_db": "D:/Photos/index/library.sqlite",
+  "log_dir": "D:/Photos/logs",
+  "reports_dir": "D:/Photos/reports",
+
+  "apply": {
+    "default_op": "copy",
+    "never_modify_sources": true,
+    "quarantine_exact_dupes": true
+  }
+}

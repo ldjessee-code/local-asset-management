@@ -1,0 +1,38 @@
+{
+  // Spreadsheets and related office files, grouped by extension.
+  // Copy to library.jsonc outside the destination, then edit paths.
+
+  "profile": "spacious",
+
+  "sources": [
+    {
+      "path": "D:/Documents/finance",
+      "layout": "by_ext",
+      "priority": 30
+    },
+    {
+      "path": "D:/Downloads",
+      "layout": "by_ext",
+      "priority": 5
+    }
+  ],
+
+  "library_root": "D:/OfficeLib/media",
+  "quarantine": "D:/OfficeLib/_quarantine",
+  "index_db": "D:/OfficeLib/index/library.sqlite",
+  "log_dir": "D:/OfficeLib/logs",
+  "reports_dir": "D:/OfficeLib/reports",
+
+  "groups": {
+    "images": [".png", ".jpg", ".jpeg", ".webp"],
+    "sidecars": [".txt", ".md", ".pdf", ".nfo"],
+    "spreadsheets": [".xlsx", ".xls", ".csv", ".ods"],
+    "archives": [".zip"]
+  },
+
+  "apply": {
+    "default_op": "copy",
+    "never_modify_sources": true,
+    "quarantine_exact_dupes": true
+  }
+}
