@@ -1,15 +1,17 @@
 {
   "schema": "file-action-results/v1",
+  "plan_schema": "file-action-plan/v1",
+  "warnings": [],
   "plan": "C:\\Example\\file-action-plan.sample.json",
   "mode": "dry-run",
-  "started": "2026-09-28T13:26:10-04:00",
-  "finished": "2026-09-28T13:26:10-04:00",
+  "started": "2026-09-28T14:10:00-04:00",
+  "finished": "2026-09-28T14:10:00-04:00",
   "summary": {
     "total": 4,
     "ok": 0,
-    "would_ok": 1,
+    "would_ok": 0,
     "failed": 0,
-    "would_fail": 3,
+    "would_fail": 4,
     "skipped": 0
   },
   "items": [
@@ -19,8 +21,8 @@
       "op": "mkdir",
       "src": null,
       "dst": "C:\\Example\\Library\\Inbox",
-      "status": "would_ok",
-      "reason": "would create directory",
+      "status": "would_fail",
+      "reason": "refused: example path",
       "size": null,
       "sha256": null
     },
@@ -31,7 +33,7 @@
       "src": "C:\\Example\\Inbox\\route_table.csv",
       "dst": "C:\\Example\\Library\\Inbox\\route_table.csv",
       "status": "would_fail",
-      "reason": "source does not exist",
+      "reason": "refused: example path",
       "size": null,
       "sha256": null
     },
@@ -42,7 +44,7 @@
       "src": "C:\\Example\\Inbox\\README.txt",
       "dst": "C:\\Example\\Library\\Inbox\\README.txt",
       "status": "would_fail",
-      "reason": "source does not exist",
+      "reason": "refused: example path",
       "size": null,
       "sha256": null
     },
@@ -53,7 +55,7 @@
       "src": "C:\\Example\\Inbox\\scratch.tmp",
       "dst": null,
       "status": "would_fail",
-      "reason": "source does not exist",
+      "reason": "refused: example path",
       "size": null,
       "sha256": null
     }

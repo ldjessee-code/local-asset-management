@@ -21,8 +21,10 @@ sources on disk
 ```
 
 `lam actions` is a **separate** opt-in JSON runner (`lam.actions`), not a
-stage of this pipeline. It reads `file-action-plan/v1`, dry-runs by
-default, and executes only with `--apply`.
+stage of this pipeline. It reads a registered plan schema (today
+`file-action-plan/v1`; see `lam/schemas/registry.py`), dry-runs by
+default, and executes only with `--apply`. Field reference:
+[file-action-plan.md](file-action-plan.md).
 
 The browser talks JSON to FastAPI. Jobs run in a background thread on the
 machine that can see the disks.
@@ -39,6 +41,7 @@ machine that can see the disks.
 | `lam.layouts` | named dest templates |
 | `lam.plan` / `lam.apply` | destinations, then copy |
 | `lam.actions` | JSON file-action runner (dry-run / `--apply` / undo) |
+| `lam.schemas.registry` | Plan and results schema ids (`supported` / `deprecated` / `removed`) |
 | `lam.schema_lite` | stdlib JSON Schema subset for those plans |
 | `lam.report` | markdown + JSON |
 | `lam.web.app` | FastAPI |

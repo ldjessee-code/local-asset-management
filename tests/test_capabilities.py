@@ -14,6 +14,15 @@ def test_describe_capabilities_has_pipeline_and_public_api():
     text = format_capabilities_text(cap)
     assert "lam scan" in text
     assert "keep_relpath" in text
+    file_actions = cap["safety"]["file_actions"]
+    assert file_actions["plan_schema_ids"]["supported"] == ["file-action-plan/v1"]
+    assert file_actions["plan_schema_ids"]["deprecated"] == []
+    assert file_actions["results_schema_ids"]["supported"] == ["file-action-results/v1"]
+    assert file_actions["results_schema_ids"]["deprecated"] == []
+    assert file_actions["refuses_example_paths"] is True
+    assert "plan supported: file-action-plan/v1" in text
+    assert "results supported: file-action-results/v1" in text
+    assert "plan deprecated: (none)" in text
 
 
 def test_cli_capabilities_no_config(capsys):
@@ -23,6 +32,8 @@ def test_cli_capabilities_no_config(capsys):
     main(["capabilities", "--json"])
     json_out = capsys.readouterr().out
     assert '"pipeline"' in json_out
+    assert "file-action-plan/v1" in json_out
+    assert "file-action-results/v1" in json_out
 
 
 def test_capabilities_http_needs_no_token():

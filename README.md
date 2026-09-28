@@ -101,11 +101,15 @@ lam apply --yes
 ### File-action plans (`lam actions`)
 
 A planner (a person, a script, or a local model) writes a JSON plan
-(`file-action-plan/v1`). The runner validates it, dry-runs every pre-check
-by default, and executes only with `--apply`. Nothing is overwritten.
-`recycle` sends items to the Windows Recycle Bin; there is no permanent
-delete. Paths under a `.git` directory are refused. `--apply` appends an
-undo CSV (`MOVE` / `COPY` / `RECYCLE` / `MKDIR`) next to the results file.
+(`file-action-plan/v1`, or another id the schema registry still accepts).
+The runner validates it, dry-runs every pre-check by default, and executes
+only with `--apply`. Nothing is overwritten. `recycle` sends items to the
+Windows Recycle Bin; there is no permanent delete. A cross-volume file move
+verifies the copy, then sends the source to the Recycle Bin the same way.
+Paths under a `.git` directory are refused. Paths at or under `C:\Example`
+are refused (`refused: example path`) on dry-run, `--apply`, and undo.
+`--apply` appends an undo CSV (`MOVE` / `COPY` / `RECYCLE` / `MKDIR`) next
+to the results file.
 
 This command does **not** use `library.jsonc` and does **not** change how
 `lam apply` or `never_modify_sources` behave.
@@ -126,6 +130,9 @@ Sample plan and results: [examples/file-action-plan.sample.json](examples/file-a
 [examples/file-action-results.sample.json](examples/file-action-results.sample.json).
 Schema files: `lam/schemas/file-action-plan.v1.schema.json` and
 `lam/schemas/file-action-results.v1.schema.json`.
+Field reference, exit codes, and the versioning policy:
+[docs/file-action-plan.md](docs/file-action-plan.md).
+Schema registry: `lam/schemas/registry.py`.
 
 Or create it from the UI with no file at all:
 
@@ -199,7 +206,7 @@ This is a **home/LAN** tool. Do not put it on the public internet.
 - `protect_paths` (optional) blocks writes outside the library and quarantine
 - `lam actions` is a separate opt-in runner: dry-run default, `--apply` to
   execute, never overwrite, Recycle Bin not delete, `.git` paths refused,
-  undo log on apply
+  `C:\Example` refused, undo log on apply
 
 ## License
 

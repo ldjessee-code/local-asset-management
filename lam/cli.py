@@ -75,9 +75,9 @@ def build_parser() -> argparse.ArgumentParser:
     actions_sub = actions.add_subparsers(dest="actions_cmd", required=True)
     run_p = actions_sub.add_parser(
         "run",
-        help="Validate and run a file-action-plan/v1 JSON file (dry-run unless --apply)",
+        help="Validate and run a JSON file-action plan (dry-run unless --apply)",
     )
-    run_p.add_argument("plan", help="Path to a file-action-plan/v1 JSON file")
+    run_p.add_argument("plan", help="Path to a JSON file-action plan")
     run_p.add_argument(
         "--apply",
         action="store_true",

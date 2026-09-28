@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/file-action-plan.v1.schema.json",
   "title": "file-action-plan/v1",
-  "description": "A versioned list of file actions. Paths must be absolute (enforced in code).",
+  "description": "A versioned list of file actions. Paths must be absolute. Paths under .git or at or under C:\\Example are refused in code (not by this schema).",
   "type": "object",
   "required": ["schema", "actions"],
   "additionalProperties": false,

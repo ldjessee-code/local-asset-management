@@ -2,7 +2,7 @@
   "schema": "file-action-plan/v1",
   "created": "2026-09-28T13:26:00-04:00",
   "created_by": "example",
-  "note": "Documentation only. Paths under C:\\Example do not exist. Dry-run this file; do not --apply it.",
+  "note": "Documentation only. Every path is under C:\\Example, which the runner refuses (refused: example path) on dry-run, --apply, and undo.",
   "actions": [
     {
       "id": "mkdir-inbox",

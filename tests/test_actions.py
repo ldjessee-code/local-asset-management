@@ -10,8 +10,11 @@ import pytest
 from lam.actions import (
     PLAN_SCHEMA_ID,
     REASON_ALREADY,
+    REASON_CROSS_KEPT,
     REASON_DST_EXISTS,
     REASON_DST_IS_FILE,
+    REASON_DST_PARENT,
+    REASON_EXAMPLE,
     REASON_GIT,
     REASON_MISSING_SRC,
     REASON_NOT_V1,
@@ -19,6 +22,8 @@ from lam.actions import (
     REASON_SHA,
     REASON_STOP,
     PlanError,
+    RecycleUnavailable,
+    _is_example_path,
     run_file_actions,
     undo_file_actions,
     validate_plan_document,
@@ -359,6 +364,8 @@ def test_results_json_shape(tmp_path: Path):
     loaded = json.loads(results_path.read_text(encoding="utf-8"))
     assert validate_results_document(loaded) == []
     assert loaded["schema"] == "file-action-results/v1"
+    assert loaded["plan_schema"] == PLAN_SCHEMA_ID
+    assert loaded["warnings"] == []
     assert loaded["mode"] == "apply"
     assert loaded["plan"]
     assert loaded["started"]
@@ -478,6 +485,8 @@ def test_undo_recycle_is_manual(tmp_path: Path):
     assert code == 0
     assert results["items"][0]["status"] == "skipped"
     assert results["items"][0]["reason"] == REASON_RESTORE_MANUAL
+    assert results["plan_schema"] is None
+    assert results["warnings"] == []
 
 
 def test_directory_move_same_volume(tmp_path: Path):
@@ -539,3 +548,305 @@ def test_real_recycle_optional(tmp_path: Path):
     assert code == 0
     assert not src.exists()
     assert results["items"][0]["status"] == "ok"
+
+
+def _guard_example_writes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail the test instead of touching C:\\Example if the guard regresses."""
+    import lam.actions as actions
+
+    real_mkdir = Path.mkdir
+
+    def mkdir(self: Path, *args, **kwargs):
+        if _is_example_path(self):
+            raise AssertionError(f"mkdir on example path: {self}")
+        return real_mkdir(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", mkdir)
+
+    real_copy = actions._copy_file_exclusive
+
+    def copy(src: Path, dst: Path) -> str:
+        if _is_example_path(src) or _is_example_path(dst):
+            raise AssertionError(f"copy onto example path: {src} -> {dst}")
+        return real_copy(src, dst)
+
+    monkeypatch.setattr(actions, "_copy_file_exclusive", copy)
+
+    real_rename = actions._rename_no_overwrite
+
+    def rename(src: Path, dst: Path) -> None:
+        if _is_example_path(src) or _is_example_path(dst):
+            raise AssertionError(f"rename onto example path: {src} -> {dst}")
+        return real_rename(src, dst)
+
+    monkeypatch.setattr(actions, "_rename_no_overwrite", rename)
+
+    real_rmdir = os.rmdir
+
+    def rmdir(path, *args, **kwargs):
+        if _is_example_path(Path(path)):
+            raise AssertionError(f"rmdir on example path: {path}")
+        return real_rmdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "rmdir", rmdir)
+
+    current = actions.recycle_path
+
+    def recycle(path: Path) -> None:
+        if _is_example_path(Path(path)):
+            raise AssertionError(f"recycle on example path: {path}")
+        current(path)
+
+    monkeypatch.setattr(actions, "recycle_path", recycle)
+
+
+def test_example_path_predicate():
+    assert _is_example_path(Path(r"C:\Example"))
+    assert _is_example_path(Path(r"C:\Example\Inbox"))
+    assert _is_example_path(Path(r"c:\example\nested\file.txt"))
+    assert _is_example_path(Path(r"C:\EXAMPLE\NOPE"))
+    assert _is_example_path(Path(r"\\?\C:\Example\foo"))
+    assert not _is_example_path(Path(r"C:\Examples"))
+    assert not _is_example_path(Path(r"C:\Examples\a.txt"))
+    assert not _is_example_path(Path(r"C:\ExampleFoo"))
+    assert not _is_example_path(Path(r"C:\ExampleFoo\a.txt"))
+    assert not _is_example_path(Path(r"C:\Other\Example\a.txt"))
+
+
+def test_example_path_guard_dry_run_apply_and_undo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    _guard_example_writes(monkeypatch)
+    src = tmp_path / "real.txt"
+    src.write_text("keep", encoding="utf-8")
+    plan = _plan(
+        tmp_path / "plan.json",
+        [
+            {"op": "mkdir", "dst": r"C:\Example"},
+            {"op": "mkdir", "dst": r"C:\Example\Library\Inbox"},
+            {"op": "mkdir", "dst": r"c:\EXAMPLE\Nested"},
+            {"op": "copy", "src": r"C:\Examples\a.txt", "dst": str(tmp_path / "from-examples.txt")},
+            {"op": "copy", "src": r"C:\ExampleFoo\a.txt", "dst": str(tmp_path / "from-foo.txt")},
+            {"op": "move", "src": str(src), "dst": r"C:\Other\Example\out.txt"},
+            {"op": "recycle", "src": r"C:\Example\Inbox\scratch.tmp"},
+            {"op": "copy", "src": str(src), "dst": r"C:\Example\out.txt"},
+        ],
+    )
+    dry, code, _, _, _ = _run(plan, tmp_path, "ex-dry")
+    assert code == 1
+    reasons = [item["reason"] for item in dry["items"]]
+    assert reasons == [
+        REASON_EXAMPLE,
+        REASON_EXAMPLE,
+        REASON_EXAMPLE,
+        REASON_MISSING_SRC,
+        REASON_MISSING_SRC,
+        REASON_DST_PARENT,
+        REASON_EXAMPLE,
+        REASON_EXAMPLE,
+    ]
+    assert all(item["status"] == "would_fail" for item in dry["items"])
+    assert src.read_text(encoding="utf-8") == "keep"
+    assert not (tmp_path / "from-examples.txt").exists()
+
+    applied, acode, _, _, _ = _run(plan, tmp_path, "ex-apply", apply=True)
+    assert acode == 1
+    assert [item["reason"] for item in applied["items"]] == reasons
+    assert all(item["status"] == "failed" for item in applied["items"])
+    assert src.read_text(encoding="utf-8") == "keep"
+
+    kept = tmp_path / "kept.txt"
+    kept.write_text("stay", encoding="utf-8")
+    log = tmp_path / "undo.csv"
+    log.write_text(
+        '"action","source","destination","size","sha256","timestamp"\n'
+        f'"MKDIR","","C:\\Example\\Inbox","","","2026-09-28T13:22:21-04:00"\n'
+        f'"MOVE","C:\\Example\\a.txt","{kept}","","","2026-09-28T13:22:21-04:00"\n'
+        '"COPY","","C:\\Example\\copied.txt","","","2026-09-28T13:22:21-04:00"\n'
+        f'"RECYCLE","C:\\Example\\gone.txt","","","","2026-09-28T13:22:21-04:00"\n',
+        encoding="utf-8",
+    )
+    undo_dry, ucode, _, _, _ = _undo(log, tmp_path, "ex-undo-dry")
+    assert ucode == 1
+    assert [item["reason"] for item in undo_dry["items"]] == [REASON_EXAMPLE] * 4
+    assert all(item["status"] == "would_fail" for item in undo_dry["items"])
+    undo_apply, uacode, _, _, _ = _undo(log, tmp_path, "ex-undo-apply", apply=True)
+    assert uacode == 1
+    assert [item["reason"] for item in undo_apply["items"]] == [REASON_EXAMPLE] * 4
+    assert kept.read_text(encoding="utf-8") == "stay"
+
+
+def test_deprecated_plan_schema_warns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    import copy
+
+    from lam.schemas.registry import PLAN_SCHEMAS, SchemaEntry
+
+    deprecated_id = "file-action-plan/deprecated-test"
+    document = copy.deepcopy(PLAN_SCHEMAS[PLAN_SCHEMA_ID].load_document())
+    document["properties"]["schema"] = {"const": deprecated_id}
+    updated = dict(PLAN_SCHEMAS)
+    updated[deprecated_id] = SchemaEntry(
+        schema_id=deprecated_id,
+        kind="plan",
+        status="deprecated",
+        removal_note="removed in 9.9 (test only)",
+        document=document,
+    )
+    monkeypatch.setattr("lam.schemas.registry.PLAN_SCHEMAS", updated)
+
+    src = tmp_path / "a.txt"
+    src.write_text("a", encoding="utf-8")
+    dst = tmp_path / "b.txt"
+    plan = tmp_path / "plan.json"
+    plan.write_text(
+        json.dumps(
+            {
+                "schema": deprecated_id,
+                "actions": [{"op": "copy", "src": str(src), "dst": str(dst)}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    results, code, lines, _, _ = _run(plan, tmp_path, "deprecated")
+    assert code == 0
+    assert results["plan_schema"] == deprecated_id
+    warning = "plan schema file-action-plan/deprecated-test is deprecated; removed in 9.9 (test only)"
+    assert results["warnings"] == [warning]
+    assert f"warning: {warning}" in lines
+    assert results["items"][0]["status"] == "would_ok"
+    assert not dst.exists()
+
+
+def test_unknown_and_removed_plan_schema(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from lam.schemas.registry import PLAN_SCHEMAS, SchemaEntry
+
+    unknown = tmp_path / "unknown.json"
+    unknown.write_text(
+        json.dumps({"schema": "file-action-plan/v9", "actions": []}),
+        encoding="utf-8",
+    )
+    out = tmp_path / "unknown-out.json"
+    with pytest.raises(PlanError) as caught:
+        run_file_actions(unknown, results_path=out, printer=lambda _s: None)
+    assert str(caught.value) == "unsupported plan schema file-action-plan/v9; supported: file-action-plan/v1"
+    assert not out.exists()
+    assert _cli(["actions", "run", str(unknown), "--results", str(tmp_path / "unknown-cli.json")]) == 2
+
+    removed_id = "file-action-plan/v-removed"
+    deprecated_id = "file-action-plan/deprecated-test"
+    updated = dict(PLAN_SCHEMAS)
+    updated[deprecated_id] = SchemaEntry(
+        schema_id=deprecated_id,
+        kind="plan",
+        status="deprecated",
+        removal_note="removed in 9.9 (test only)",
+        filename="file-action-plan.v1.schema.json",
+    )
+    updated[removed_id] = SchemaEntry(
+        schema_id=removed_id,
+        kind="plan",
+        status="removed",
+        removal_note="removed in 0.2",
+    )
+    monkeypatch.setattr("lam.schemas.registry.PLAN_SCHEMAS", updated)
+
+    removed = tmp_path / "removed.json"
+    removed.write_text(json.dumps({"schema": removed_id, "actions": []}), encoding="utf-8")
+    with pytest.raises(PlanError) as removed_caught:
+        run_file_actions(removed, results_path=tmp_path / "removed-out.json", printer=lambda _s: None)
+    removed_message = (
+        "unsupported plan schema file-action-plan/v-removed; "
+        "supported: file-action-plan/v1; deprecated: file-action-plan/deprecated-test"
+    )
+    assert str(removed_caught.value) == removed_message
+    assert _cli(["actions", "run", str(removed), "--results", str(tmp_path / "removed-cli.json")]) == 2
+
+    with pytest.raises(PlanError) as listed:
+        run_file_actions(unknown, results_path=tmp_path / "unknown-listed.json", printer=lambda _s: None)
+    assert str(listed.value) == (
+        "unsupported plan schema file-action-plan/v9; "
+        "supported: file-action-plan/v1; deprecated: file-action-plan/deprecated-test"
+    )
+
+
+def _forbid_remove(monkeypatch: pytest.MonkeyPatch, *paths: Path) -> None:
+    banned = {os.path.normcase(os.path.abspath(str(path))) for path in paths}
+    real_remove = os.remove
+
+    def guard(path, *args, **kwargs):
+        if os.path.normcase(os.path.abspath(str(path))) in banned:
+            raise AssertionError(f"os.remove on user path: {path}")
+        return real_remove(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "remove", guard)
+
+
+def test_cross_volume_move_recycles_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_recycle: Path):
+    monkeypatch.setattr("lam.actions._same_volume", lambda _src, _dst: False)
+    src = tmp_path / "from.txt"
+    payload = b"cross-volume-bytes"
+    src.write_bytes(payload)
+    dest_dir = tmp_path / "other"
+    dest_dir.mkdir()
+    dst = dest_dir / "from.txt"
+    _forbid_remove(monkeypatch, src, dst)
+    plan = _plan(tmp_path / "plan.json", [{"op": "move", "src": str(src), "dst": str(dst)}])
+    results, code, _, _, undo_path = _run(plan, tmp_path, "cross-ok", apply=True)
+    assert code == 0
+    assert results["items"][0]["status"] == "ok"
+    assert results["items"][0]["reason"] == "moved"
+    assert not src.exists()
+    assert dst.read_bytes() == payload
+    assert any(path.name.startswith("from.txt") for path in fake_recycle.iterdir())
+    rows = list(csv.reader(undo_path.open(newline="", encoding="utf-8")))
+    assert rows[1][0] == "MOVE"
+
+
+@pytest.mark.parametrize(
+    ("mode", "detail"),
+    [
+        ("unavailable", "no recycle bin available"),
+        ("oserror", "recycle failed: code 2"),
+        ("still_there", "recycle did not remove source"),
+    ],
+)
+def test_cross_volume_move_recycle_failure_keeps_both(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_recycle: Path,
+    mode: str,
+    detail: str,
+):
+    monkeypatch.setattr("lam.actions._same_volume", lambda _src, _dst: False)
+    src = tmp_path / "from.txt"
+    payload = b"cross-volume-bytes"
+    src.write_bytes(payload)
+    dest_dir = tmp_path / "other"
+    dest_dir.mkdir()
+    dst = dest_dir / "from.txt"
+    _forbid_remove(monkeypatch, src, dst)
+
+    def boom(path: Path) -> None:
+        if mode == "unavailable":
+            raise RecycleUnavailable("no recycle bin available")
+        if mode == "oserror":
+            raise OSError("recycle failed: code 2")
+        assert path == src or os.path.normcase(str(path)) == os.path.normcase(str(src))
+
+    plan = _plan(tmp_path / "plan.json", [{"op": "move", "src": str(src), "dst": str(dst)}])
+    results, code, _, _, undo_path = _run(plan, tmp_path, f"cross-{mode}", apply=True, recycle_fn=boom)
+    assert code == 1
+    assert results["items"][0]["status"] == "failed"
+    assert results["items"][0]["reason"] == f"{REASON_CROSS_KEPT}: {detail}"
+    assert src.read_bytes() == payload
+    assert dst.read_bytes() == payload
+    rows = list(csv.reader(undo_path.open(newline="", encoding="utf-8")))
+    assert rows[1][0] == "COPY"
+    assert os.path.normcase(rows[1][1]) == os.path.normcase(os.path.abspath(src))
+    assert os.path.normcase(rows[1][2]) == os.path.normcase(os.path.abspath(dst))
+    assert rows[1][4] == sha256_full(dst).upper()
+
+    undone, ucode, _, _, _ = _undo(undo_path, tmp_path, f"cross-undo-{mode}", apply=True)
+    assert ucode == 0
+    assert undone["items"][0]["status"] == "ok"
+    assert src.read_bytes() == payload
+    assert not dst.exists()
+    assert any(path.name.startswith("from.txt") for path in fake_recycle.iterdir())

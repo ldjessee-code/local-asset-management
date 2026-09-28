@@ -13,7 +13,7 @@ paths are not committed.
 | [library.example.jsonc](library.example.jsonc) | Screenshots + Patreon/VTT packs (the original design case) |
 | [photos.jsonc](photos.jsonc) | Camera dumps into a year/month tree |
 | [spreadsheets.jsonc](spreadsheets.jsonc) | Office files grouped by extension |
-| [file-action-plan.sample.json](file-action-plan.sample.json) | Sample `file-action-plan/v1` (fake `C:\Example\...` paths) |
+| [file-action-plan.sample.json](file-action-plan.sample.json) | Sample `file-action-plan/v1`. Every path is under `C:\Example`, which the runner refuses |
 | [file-action-results.sample.json](file-action-results.sample.json) | Sample dry-run results for that plan |
 
 Or skip the copy: `lam serve` and fill in sources + output in the UI.

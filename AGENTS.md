@@ -28,8 +28,9 @@ product. The browser is a remote control, not the hasher.
 - **`lam actions` is a separate opt-in runner**, not part of that pipeline.
   Dry-run is the default. It moves, copies, creates directories, or sends
   files to the Recycle Bin only with `--apply`. It never overwrites, never
-  writes under a `.git` path, and never permanently deletes. Recycle is the
-  Windows Recycle Bin (recoverable). `--apply` writes an undo CSV.
+  writes under a `.git` path, refuses `C:\Example`, and never permanently
+  deletes. Recycle is the Windows Recycle Bin (recoverable), including the
+  source of a verified cross-volume file move. `--apply` writes an undo CSV.
 
 ## Where truth lives
 
@@ -40,7 +41,22 @@ product. The browser is a remote control, not the hasher.
 | Design intent | `library-index-spec.md` |
 | How the pieces fit | `docs/architecture.md` |
 | Human install / CLI | `README.md` |
+| JSON file-action plan / results format | `docs/file-action-plan.md`, `lam/schemas/` |
 | License | `LICENSE` (AGPL-3.0-or-later, unmodified FSF text) |
+
+## JSON file-action format
+
+`lam actions` reads a JSON plan and writes a JSON results file. The schema
+registry is `lam/schemas/registry.py`. Each plan schema id and each results
+schema id is `supported`, `deprecated` (with a removal note), or `removed`.
+Unknown and removed plan ids fail before anything runs.
+
+- Plan schema: `lam/schemas/file-action-plan.v1.schema.json` (`file-action-plan/v1`)
+- Results schema: `lam/schemas/file-action-results.v1.schema.json` (`file-action-results/v1`)
+- Field reference, exit codes, and the versioning policy: `docs/file-action-plan.md`
+
+Paths at or under `C:\Example` are refused (`refused: example path`) on dry-run,
+`--apply`, and undo, so `examples/file-action-plan.sample.json` cannot touch disk.
 
 ## Pipeline
 

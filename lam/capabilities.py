@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from lam.config import DEFAULT_LAYOUTS, LAYOUT_NAMES
+from lam.schemas.registry import PLAN_SCHEMAS, RESULTS_SCHEMAS, status_groups
 from lam.version import __version__
 
 SOURCE_URL = "https://github.com/ldjessee-code/local-asset-management"
@@ -161,6 +162,9 @@ def describe_capabilities() -> dict[str, Any]:
             "file_actions": {
                 "schema": "file-action-plan/v1",
                 "results_schema": "file-action-results/v1",
+                "plan_schema_ids": status_groups(PLAN_SCHEMAS),
+                "results_schema_ids": status_groups(RESULTS_SCHEMAS),
+                "schema_registry": "lam/schemas/registry.py",
                 "command": "lam actions run PLAN.json",
                 "undo_command": "lam actions undo UNDO.csv",
                 "dry_run_default": True,
@@ -168,6 +172,7 @@ def describe_capabilities() -> dict[str, Any]:
                 "never_overwrite": True,
                 "recycle_not_delete": True,
                 "refuses_git_paths": True,
+                "refuses_example_paths": True,
                 "writes_undo_log": True,
                 "separate_from_pipeline": True,
             },
@@ -210,6 +215,19 @@ def format_capabilities_text(data: dict[str, Any] | None = None) -> str:
     lines += ["", "Layouts:"]
     for name, pattern in cap["layouts"].items():
         lines.append(f"  {name}: {pattern}")
+    file_actions = cap["safety"]["file_actions"]
+    plan_ids = file_actions["plan_schema_ids"]
+    result_ids = file_actions["results_schema_ids"]
+    lines += ["", "File-action schemas:"]
+    lines.append("  plan supported: " + ", ".join(plan_ids["supported"]))
+    lines.append(
+        "  plan deprecated: " + (", ".join(plan_ids["deprecated"]) if plan_ids["deprecated"] else "(none)")
+    )
+    lines.append("  results supported: " + ", ".join(result_ids["supported"]))
+    lines.append(
+        "  results deprecated: "
+        + (", ".join(result_ids["deprecated"]) if result_ids["deprecated"] else "(none)")
+    )
     lines += ["", "Not in v0.1:"]
     for item in cap["safety"]["not_in_v1"]:
         lines.append(f"  - {item}")

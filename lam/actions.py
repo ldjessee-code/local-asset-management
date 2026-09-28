@@ -3,6 +3,8 @@
 
 Separate from the ``scan → report → plan → apply`` pipeline. Never
 overwrites, never permanently deletes. ``recycle`` goes to the Recycle Bin.
+A cross-volume file move recycles the verified source the same way.
+Paths at or under ``C:\\Example`` are refused.
 """
 
 from __future__ import annotations
@@ -21,14 +23,14 @@ from typing import Any, TextIO
 
 from lam.hashing import sha256_full
 from lam.schema_lite import validate_json
-
-PLAN_SCHEMA_ID = "file-action-plan/v1"
-RESULTS_SCHEMA_ID = "file-action-results/v1"
+from lam.schemas import registry as schema_registry
+from lam.schemas.registry import PLAN_SCHEMA_ID, RESULTS_SCHEMA_ID
 OPS = ("move", "copy", "recycle", "mkdir")
 UNDO_HEADER = ["action", "source", "destination", "size", "sha256", "timestamp"]
 SHA256_LEN = 64
 
 REASON_GIT = "refused: path under .git"
+REASON_EXAMPLE = "refused: example path"
 REASON_MISSING_SRC = "source does not exist"
 REASON_SHA = "sha256 mismatch"
 REASON_DST_EXISTS = "destination exists"
@@ -43,10 +45,9 @@ REASON_STOP = "stopped after earlier error"
 REASON_RESTORE_MANUAL = "restore manually from the Recycle Bin"
 REASON_DIR_NOT_EMPTY = "directory is not empty"
 REASON_CROSS_DIR = "cross-volume directory move not supported in v1"
-
-_SCHEMA_DIR = Path(__file__).resolve().parent / "schemas"
-_PLAN_SCHEMA_PATH = _SCHEMA_DIR / "file-action-plan.v1.schema.json"
-_RESULTS_SCHEMA_PATH = _SCHEMA_DIR / "file-action-results.v1.schema.json"
+REASON_CROSS_KEPT = (
+    "verified copy exists at the destination and the source was left in place"
+)
 
 PrintFn = Callable[[str], None]
 RecycleFn = Callable[[Path], None]
@@ -61,16 +62,39 @@ class PlanError(ValueError):
 
 
 def load_plan_schema() -> dict:
-    return json.loads(_PLAN_SCHEMA_PATH.read_text(encoding="utf-8"))
+    return schema_registry.PLAN_SCHEMAS[PLAN_SCHEMA_ID].load_document()
 
 
 def load_results_schema() -> dict:
-    return json.loads(_RESULTS_SCHEMA_PATH.read_text(encoding="utf-8"))
+    return schema_registry.RESULTS_SCHEMAS[RESULTS_SCHEMA_ID].load_document()
+
+
+def _readable_entry(table: dict, schema_id: str) -> schema_registry.SchemaEntry | None:
+    entry = table.get(schema_id)
+    if entry is None or entry.status not in {
+        schema_registry.STATUS_SUPPORTED,
+        schema_registry.STATUS_DEPRECATED,
+    }:
+        return None
+    return entry
 
 
 def validate_plan_document(data: Any) -> list[str]:
-    """Return schema + absolute-path errors. Empty list means the plan is valid."""
-    errors = validate_json(data, load_plan_schema())
+    """Return schema + absolute-path errors. Empty list means the plan is valid.
+
+    An unknown or removed ``schema`` id is a single error whose text is
+    ``unsupported plan schema ...`` (the runner raises that string as-is).
+    """
+    table = schema_registry.PLAN_SCHEMAS
+    if isinstance(data, dict) and isinstance(data.get("schema"), str):
+        schema_id = data["schema"]
+        entry = _readable_entry(table, schema_id)
+        if entry is None:
+            return [schema_registry.unsupported_message("plan", schema_id, table)]
+        schema = entry.load_document()
+    else:
+        schema = load_plan_schema()
+    errors = validate_json(data, schema)
     if errors:
         return errors
     if not isinstance(data, dict):
@@ -85,7 +109,27 @@ def validate_plan_document(data: Any) -> list[str]:
 
 
 def validate_results_document(data: Any) -> list[str]:
+    table = schema_registry.RESULTS_SCHEMAS
+    if isinstance(data, dict) and isinstance(data.get("schema"), str):
+        schema_id = data["schema"]
+        entry = _readable_entry(table, schema_id)
+        if entry is None:
+            return [schema_registry.unsupported_message("results", schema_id, table)]
+        return validate_json(data, entry.load_document())
     return validate_json(data, load_results_schema())
+
+
+def plan_deprecation_warning(data: Any) -> str | None:
+    """Warning text when the plan id is deprecated, else None."""
+    if not isinstance(data, dict):
+        return None
+    schema_id = data.get("schema")
+    if not isinstance(schema_id, str):
+        return None
+    entry = schema_registry.PLAN_SCHEMAS.get(schema_id)
+    if entry is None or entry.status != schema_registry.STATUS_DEPRECATED:
+        return None
+    return schema_registry.deprecation_warning(entry)
 
 
 def local_iso_now() -> str:
@@ -117,6 +161,32 @@ def _key(path: Path) -> str:
 
 def _under_git(path: Path) -> bool:
     return any(part.lower() == ".git" for part in _abs(path).parts)
+
+
+def _is_example_path(path: Path) -> bool:
+    """True for ``C:\\Example`` and anything under that directory.
+
+    Case-insensitive, on the normalized absolute path, whole path component.
+    ``C:\\Examples`` and ``C:\\ExampleFoo`` do not match. A ``\\\\?\\`` prefix
+    is stripped so an extended path is the same path.
+    """
+    text = str(_abs(path))
+    prefix = "\\\\?\\"
+    if text.startswith(prefix):
+        text = os.path.normpath(text[len(prefix):])
+    normalized = os.path.normcase(text)
+    root = os.path.normcase(os.path.normpath(r"C:\Example"))
+    if normalized == root:
+        return True
+    return normalized.startswith(root + os.sep)
+
+
+def _hits_example(src: Path | None, dst: Path | None) -> bool:
+    if src is not None and _is_example_path(src):
+        return True
+    if dst is not None and _is_example_path(dst):
+        return True
+    return False
 
 
 def _key_is_under(inner: str, outer: str) -> bool:
@@ -318,13 +388,46 @@ def _recycle_windows(path: Path) -> None:
 
 
 def _remove_owned_file(path: Path) -> None:
-    """Remove a file this runner created (temp copy or failed exclusive dest)."""
+    """Remove a file this runner just created (temp copy, placeholder, or results temp).
+
+    Never call this on a path the user already had. Call sites: failed exclusive
+    copy, failed exclusive rename placeholder, abandoned ``.lam-move-*`` temp,
+    and abandoned ``.lam-tmp-*`` results file.
+    """
     os.remove(path)
 
 
-def _complete_cross_volume_file_move(src: Path) -> None:
-    """Finish a verified cross-volume file move by removing the original file."""
-    os.remove(src)
+class _VerifiedCopyKept(Exception):
+    """Verified dest copy exists and the source was not recycled."""
+
+    def __init__(self, reason: str, size: int | None = None, sha256: str | None = None):
+        super().__init__(reason)
+        self.reason = reason
+        self.size = size
+        self.sha256 = sha256
+
+
+def _cross_volume_keep_reason(detail: str) -> str:
+    detail = detail.strip()
+    if not detail:
+        return REASON_CROSS_KEPT
+    return f"{REASON_CROSS_KEPT}: {detail}"
+
+
+def _complete_cross_volume_file_move(src: Path, recycle_fn: RecycleFn) -> None:
+    """Send a verified cross-volume move source to the Recycle Bin.
+
+    On failure the source is left in place. The caller also leaves the
+    verified destination copy in place.
+    """
+    try:
+        recycle_fn(src)
+    except RecycleUnavailable as exc:
+        raise _VerifiedCopyKept(_cross_volume_keep_reason(str(exc) or REASON_NO_RECYCLE)) from exc
+    except OSError as exc:
+        raise _VerifiedCopyKept(_cross_volume_keep_reason(str(exc) or "recycle failed")) from exc
+    if src.exists():
+        raise _VerifiedCopyKept(_cross_volume_keep_reason("recycle did not remove source"))
 
 
 def _copy_file_exclusive(src: Path, dst: Path) -> str:
@@ -373,7 +476,7 @@ def _rename_no_overwrite(src: Path, dst: Path) -> None:
         raise
 
 
-def _move_path(src: Path, dst: Path) -> tuple[int | None, str | None]:
+def _move_path(src: Path, dst: Path, recycle_fn: RecycleFn) -> tuple[int | None, str | None]:
     src_is_dir = src.is_dir() and not src.is_symlink()
     size: int | None = None
     digest: str | None = None
@@ -402,7 +505,10 @@ def _move_path(src: Path, dst: Path) -> tuple[int | None, str | None]:
         tmp_alive = False
         if _hex_sha(sha256_full(dst)) != _hex_sha(digest):
             raise OSError("destination sha256 mismatch after cross-volume move")
-        _complete_cross_volume_file_move(src)
+        try:
+            _complete_cross_volume_file_move(src, recycle_fn)
+        except _VerifiedCopyKept as exc:
+            raise _VerifiedCopyKept(exc.reason, size, digest) from exc
         return size, digest
     finally:
         if tmp_alive and tmp.exists() and tmp.is_file():
@@ -428,6 +534,8 @@ def _precheck(action: dict, state: SimState) -> Prep:
     dst = Path(action["dst"]) if action.get("dst") else None
     planned_sha = action.get("sha256")
 
+    if _hits_example(src, dst):
+        return Prep(False, REASON_EXAMPLE, op, src, dst, action_id=action_id)
     if src is not None and _under_git(src):
         return Prep(False, REASON_GIT, op, src, dst, action_id=action_id)
     if dst is not None and _under_git(dst):
@@ -549,53 +657,70 @@ def _apply_sim(state: SimState, prep: Prep) -> None:
         state.mark_gone(prep.src)
 
 
-def _execute(prep: Prep, recycle_fn: RecycleFn) -> tuple[bool, str, int | None, str | None]:
+@dataclass
+class ExecOutcome:
+    ok: bool
+    reason: str
+    size: int | None = None
+    sha256: str | None = None
+    undo_action: str | None = None
+
+
+def _execute(prep: Prep, recycle_fn: RecycleFn) -> ExecOutcome:
     try:
         if prep.op == "mkdir":
             assert prep.dst is not None
             if prep.already_present:
-                return True, REASON_ALREADY, None, None
+                return ExecOutcome(True, REASON_ALREADY)
             if prep.dst.exists() and not prep.dst.is_dir():
-                return False, REASON_DST_IS_FILE, None, None
+                return ExecOutcome(False, REASON_DST_IS_FILE)
             prep.dst.mkdir(parents=True, exist_ok=True)
             if not prep.dst.is_dir():
-                return False, REASON_DST_IS_FILE, None, None
-            return True, "created directory", None, None
+                return ExecOutcome(False, REASON_DST_IS_FILE)
+            return ExecOutcome(True, "created directory")
 
         if prep.op == "copy":
             assert prep.src is not None and prep.dst is not None
             if prep.dst.exists():
-                return False, REASON_DST_EXISTS, prep.size, prep.sha256
+                return ExecOutcome(False, REASON_DST_EXISTS, prep.size, prep.sha256)
             digest = _copy_file_exclusive(prep.src, prep.dst)
             size = _file_size(prep.dst)
-            return True, "copied", size, digest
+            return ExecOutcome(True, "copied", size, digest)
 
         if prep.op == "move":
             assert prep.src is not None and prep.dst is not None
             if prep.dst.exists():
-                return False, REASON_DST_EXISTS, prep.size, prep.sha256
-            size, digest = _move_path(prep.src, prep.dst)
-            return True, "moved", size, digest
+                return ExecOutcome(False, REASON_DST_EXISTS, prep.size, prep.sha256)
+            size, digest = _move_path(prep.src, prep.dst, recycle_fn)
+            return ExecOutcome(True, "moved", size, digest)
 
         if prep.op == "recycle":
             assert prep.src is not None
             try:
                 recycle_fn(prep.src)
             except RecycleUnavailable:
-                return False, REASON_NO_RECYCLE, prep.size, prep.sha256
+                return ExecOutcome(False, REASON_NO_RECYCLE, prep.size, prep.sha256)
             if prep.src.exists():
-                return False, "recycle did not remove source", prep.size, prep.sha256
-            return True, "recycled", prep.size, prep.sha256
+                return ExecOutcome(False, "recycle did not remove source", prep.size, prep.sha256)
+            return ExecOutcome(True, "recycled", prep.size, prep.sha256)
+    except _VerifiedCopyKept as exc:
+        return ExecOutcome(
+            False,
+            exc.reason,
+            exc.size if exc.size is not None else prep.size,
+            exc.sha256 or prep.sha256,
+            "copy",
+        )
     except FileExistsError:
-        return False, REASON_DST_EXISTS, prep.size, prep.sha256
+        return ExecOutcome(False, REASON_DST_EXISTS, prep.size, prep.sha256)
     except RecycleUnavailable:
-        return False, REASON_NO_RECYCLE, prep.size, prep.sha256
+        return ExecOutcome(False, REASON_NO_RECYCLE, prep.size, prep.sha256)
     except OSError as exc:
         msg = str(exc)
         if msg in {REASON_CROSS_DIR, REASON_NO_RECYCLE}:
-            return False, msg, prep.size, prep.sha256
-        return False, f"{type(exc).__name__}: {exc}", prep.size, prep.sha256
-    return False, f"unhandled op {prep.op!r}", prep.size, prep.sha256
+            return ExecOutcome(False, msg, prep.size, prep.sha256)
+        return ExecOutcome(False, f"{type(exc).__name__}: {exc}", prep.size, prep.sha256)
+    return ExecOutcome(False, f"unhandled op {prep.op!r}", prep.size, prep.sha256)
 
 
 def _item_dict(index: int, prep: Prep, status: str, reason: str) -> dict[str, Any]:
@@ -717,6 +842,30 @@ def _write_results(path: Path, payload: dict[str, Any]) -> None:
         raise
 
 
+def _results_body(
+    *,
+    plan: str,
+    mode: str,
+    started: str,
+    finished: str,
+    summary: dict[str, int],
+    items: list[dict[str, Any]],
+    plan_schema: str | None,
+    warnings: list[str],
+) -> dict[str, Any]:
+    return {
+        "schema": RESULTS_SCHEMA_ID,
+        "plan_schema": plan_schema,
+        "warnings": list(warnings),
+        "plan": plan,
+        "mode": mode,
+        "started": started,
+        "finished": finished,
+        "summary": summary,
+        "items": items,
+    }
+
+
 def _load_plan_file(plan_path: Path) -> dict:
     if not plan_path.is_file():
         raise PlanError(f"plan not found: {plan_path}")
@@ -726,6 +875,8 @@ def _load_plan_file(plan_path: Path) -> dict:
         raise PlanError(f"plan is not valid JSON: {exc}") from exc
     errors = validate_plan_document(data)
     if errors:
+        if len(errors) == 1 and errors[0].startswith("unsupported plan schema "):
+            raise PlanError(errors[0])
         raise PlanError("invalid file-action plan:\n  " + "\n  ".join(errors))
     return data
 
@@ -740,18 +891,24 @@ def run_file_actions(
     recycle_fn: RecycleFn | None = None,
     printer: PrintFn | None = None,
 ) -> tuple[dict[str, Any], int]:
-    """Run a ``file-action-plan/v1``. Dry-run unless *apply* is true.
+    """Run a file-action plan. Dry-run unless *apply* is true.
 
     Returns ``(results, exit_code)`` where 0 = all ok, 1 = any item failed.
-    Invalid plans raise ``PlanError`` (CLI maps that to exit 2).
+    Invalid plans and unsupported or removed schema ids raise ``PlanError``
+    (CLI maps that to exit 2). A deprecated schema id runs and is warned.
     """
     plan_path = _abs(plan_path)
     data = _load_plan_file(plan_path)
+    schema_warning = plan_deprecation_warning(data)
+    warnings = [schema_warning] if schema_warning else []
+    plan_schema = data.get("schema") if isinstance(data.get("schema"), str) else None
     mode = "apply" if apply else "dry-run"
     started = local_iso_now()
     out_path = _choose_results_path(plan_path, results_path)
     rec = recycle_fn or recycle_path
     log = printer or print
+    if schema_warning:
+        log(f"warning: {schema_warning}")
     state = SimState()
     items: list[dict[str, Any]] = []
     undo_fh: TextIO | None = None
@@ -795,11 +952,11 @@ def run_file_actions(
                 _print_item(item, log)
                 _apply_sim(state, prep)
                 continue
-            ok, reason, size, digest = _execute(prep, rec)
-            prep.size = size if size is not None else prep.size
-            prep.sha256 = digest if digest else prep.sha256
-            if ok:
-                item = _item_dict(index, prep, "ok", reason)
+            outcome = _execute(prep, rec)
+            prep.size = outcome.size if outcome.size is not None else prep.size
+            prep.sha256 = outcome.sha256 if outcome.sha256 else prep.sha256
+            if outcome.ok:
+                item = _item_dict(index, prep, "ok", outcome.reason)
                 items.append(item)
                 _print_item(item, log)
                 if undo_writer is not None and undo_fh is not None and not prep.already_present:
@@ -814,9 +971,21 @@ def run_file_actions(
                     )
                 _apply_sim(state, prep)
             else:
-                item = _item_dict(index, prep, "failed", reason)
+                item = _item_dict(index, prep, "failed", outcome.reason)
                 items.append(item)
                 _print_item(item, log)
+                if outcome.undo_action and undo_writer is not None and undo_fh is not None:
+                    _append_undo(
+                        undo_writer,
+                        undo_fh,
+                        outcome.undo_action,
+                        str(_abs(prep.src)) if prep.src is not None else "",
+                        str(_abs(prep.dst)) if prep.dst is not None else "",
+                        prep.size,
+                        prep.sha256,
+                    )
+                    if outcome.undo_action == "copy" and prep.dst is not None:
+                        state.mark_present(prep.dst, "file", size=prep.size, sha256=prep.sha256)
                 if stop_on_error:
                     stopping = True
     finally:
@@ -825,15 +994,16 @@ def run_file_actions(
 
     finished = local_iso_now()
     summary = _summarize(items)
-    results = {
-        "schema": RESULTS_SCHEMA_ID,
-        "plan": str(plan_path),
-        "mode": mode,
-        "started": started,
-        "finished": finished,
-        "summary": summary,
-        "items": items,
-    }
+    results = _results_body(
+        plan=str(plan_path),
+        mode=mode,
+        started=started,
+        finished=finished,
+        summary=summary,
+        items=items,
+        plan_schema=plan_schema,
+        warnings=warnings,
+    )
     _write_results(out_path, results)
     results["_results_path"] = str(out_path)
     if undo_path is not None:
@@ -922,6 +1092,22 @@ def undo_file_actions(
             continue
 
         if op == "recycle":
+            if _hits_example(source, dest):
+                prep = Prep(
+                    False,
+                    REASON_EXAMPLE,
+                    op,
+                    source,
+                    dest,
+                    size=size,
+                    sha256=recorded_sha,
+                    action_id=action_id,
+                )
+                status = "failed" if apply else "would_fail"
+                item = _item_dict(index, prep, status, REASON_EXAMPLE)
+                items.append(item)
+                _print_item(item, log)
+                continue
             prep = Prep(
                 True,
                 REASON_RESTORE_MANUAL,
@@ -946,7 +1132,13 @@ def undo_file_actions(
 
         if op == "move":
             prep, status, reason = _undo_move(
-                source, dest, recorded_sha, size, apply=apply, state=state
+                source,
+                dest,
+                recorded_sha,
+                size,
+                apply=apply,
+                state=state,
+                recycle_fn=rec,
             )
             item = _item_dict(index, prep, status, reason)
             items.append(item)
@@ -964,15 +1156,16 @@ def undo_file_actions(
 
     finished = local_iso_now()
     summary = _summarize(items)
-    results = {
-        "schema": RESULTS_SCHEMA_ID,
-        "plan": str(undo_csv_path),
-        "mode": mode,
-        "started": started,
-        "finished": finished,
-        "summary": summary,
-        "items": items,
-    }
+    results = _results_body(
+        plan=str(undo_csv_path),
+        mode=mode,
+        started=started,
+        finished=finished,
+        summary=summary,
+        items=items,
+        plan_schema=None,
+        warnings=[],
+    )
     _write_results(out_path, results)
     results["_results_path"] = str(out_path)
     _print_summary(summary, mode, log)
@@ -984,6 +1177,9 @@ def undo_file_actions(
 def _undo_mkdir(dst: Path | None, *, apply: bool, state: SimState) -> tuple[Prep, str, str]:
     if dst is None:
         prep = Prep(False, "missing destination in undo log", "mkdir", None, None)
+        return prep, ("failed" if apply else "would_fail"), prep.reason
+    if _is_example_path(dst):
+        prep = Prep(False, REASON_EXAMPLE, "mkdir", None, dst)
         return prep, ("failed" if apply else "would_fail"), prep.reason
     if _under_git(dst):
         prep = Prep(False, REASON_GIT, "mkdir", None, dst)
@@ -1024,6 +1220,7 @@ def _undo_move(
     *,
     apply: bool,
     state: SimState,
+    recycle_fn: RecycleFn,
 ) -> tuple[Prep, str, str]:
     if source is None or dest is None:
         prep = Prep(False, "move undo needs source and destination", "move", source, dest)
@@ -1040,13 +1237,15 @@ def _undo_move(
     if not apply:
         _apply_sim(state, prep)
         return prep, "would_ok", "would move"
-    ok, reason, new_size, digest = _execute(prep, recycle_path)
-    prep.size = new_size if new_size is not None else prep.size
-    prep.sha256 = digest if digest else prep.sha256
-    if ok:
+    outcome = _execute(prep, recycle_fn)
+    prep.size = outcome.size if outcome.size is not None else prep.size
+    prep.sha256 = outcome.sha256 if outcome.sha256 else prep.sha256
+    if outcome.ok:
         _apply_sim(state, prep)
-        return prep, "ok", reason
-    return prep, "failed", reason
+        return prep, "ok", outcome.reason
+    if outcome.undo_action == "copy" and prep.dst is not None:
+        state.mark_present(prep.dst, "file", size=prep.size, sha256=prep.sha256)
+    return prep, "failed", outcome.reason
 
 
 def _undo_copy(
@@ -1085,13 +1284,13 @@ def _undo_copy(
         sha256=prep.sha256,
         src_kind=prep.src_kind,
     )
-    ok, reason, new_size, digest = _execute(rec_prep, recycle_fn)
-    prep.size = new_size if new_size is not None else prep.size
-    prep.sha256 = digest if digest else prep.sha256
-    if ok:
+    outcome = _execute(rec_prep, recycle_fn)
+    prep.size = outcome.size if outcome.size is not None else prep.size
+    prep.sha256 = outcome.sha256 if outcome.sha256 else prep.sha256
+    if outcome.ok:
         _apply_sim(state, rec_prep)
         return prep, "ok", "recycled copy"
-    return prep, "failed", reason
+    return prep, "failed", outcome.reason
 
 
 def actions_exit_from_plan_error(exc: PlanError, *, printer: PrintFn | None = None) -> int:

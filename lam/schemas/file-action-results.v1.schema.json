@@ -2,12 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/file-action-results.v1.schema.json",
   "title": "file-action-results/v1",
-  "description": "Outcome of a file-action plan run or an undo replay.",
+  "description": "Outcome of a file-action plan run or an undo replay. plan_schema and warnings are optional so results written before they existed still validate.",
   "type": "object",
   "required": ["schema", "plan", "mode", "started", "finished", "summary", "items"],
   "additionalProperties": false,
   "properties": {
     "schema": { "const": "file-action-results/v1" },
+    "plan_schema": { "type": ["string", "null"] },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
     "plan": { "type": "string", "minLength": 1 },
     "mode": { "enum": ["dry-run", "apply"] },
     "started": { "type": "string", "minLength": 1 },
