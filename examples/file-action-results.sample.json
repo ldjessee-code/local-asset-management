@@ -1,0 +1,61 @@
+{
+  "schema": "file-action-results/v1",
+  "plan": "C:\\Example\\file-action-plan.sample.json",
+  "mode": "dry-run",
+  "started": "2026-09-28T13:26:10-04:00",
+  "finished": "2026-09-28T13:26:10-04:00",
+  "summary": {
+    "total": 4,
+    "ok": 0,
+    "would_ok": 1,
+    "failed": 0,
+    "would_fail": 3,
+    "skipped": 0
+  },
+  "items": [
+    {
+      "index": 0,
+      "id": "mkdir-inbox",
+      "op": "mkdir",
+      "src": null,
+      "dst": "C:\\Example\\Library\\Inbox",
+      "status": "would_ok",
+      "reason": "would create directory",
+      "size": null,
+      "sha256": null
+    },
+    {
+      "index": 1,
+      "id": "move-csv",
+      "op": "move",
+      "src": "C:\\Example\\Inbox\\route_table.csv",
+      "dst": "C:\\Example\\Library\\Inbox\\route_table.csv",
+      "status": "would_fail",
+      "reason": "source does not exist",
+      "size": null,
+      "sha256": null
+    },
+    {
+      "index": 2,
+      "id": "copy-readme",
+      "op": "copy",
+      "src": "C:\\Example\\Inbox\\README.txt",
+      "dst": "C:\\Example\\Library\\Inbox\\README.txt",
+      "status": "would_fail",
+      "reason": "source does not exist",
+      "size": null,
+      "sha256": null
+    },
+    {
+      "index": 3,
+      "id": "recycle-scratch",
+      "op": "recycle",
+      "src": "C:\\Example\\Inbox\\scratch.tmp",
+      "dst": null,
+      "status": "would_fail",
+      "reason": "source does not exist",
+      "size": null,
+      "sha256": null
+    }
+  ]
+}

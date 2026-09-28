@@ -46,9 +46,12 @@ lam = "lam.cli:main"
 include = ["lam*"]
 
 [tool.setuptools.package-data]
-lam = ["web/static/**/*"]
+lam = ["web/static/**/*", "schemas/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q"
+markers = [
+  "real_recycle: send a tmp_path file to the real Recycle Bin (LAM_TEST_REAL_RECYCLE=1)",
+]

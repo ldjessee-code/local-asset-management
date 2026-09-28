@@ -22,6 +22,7 @@ blocks extra drives or folders from being modified.
 
 from __future__ import annotations
 
+from lam.actions import run_file_actions, undo_file_actions
 from lam.apply import run_apply
 from lam.capabilities import describe_capabilities, format_capabilities_text
 from lam.config import (
@@ -43,8 +44,10 @@ __all__ = [
     "format_capabilities_text",
     "load_config",
     "run_apply",
+    "run_file_actions",
     "run_plan",
     "run_scan",
     "setup_from_form",
+    "undo_file_actions",
     "write_reports",
 ]

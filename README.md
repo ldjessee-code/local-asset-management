@@ -24,8 +24,10 @@ Developers: [docs/architecture.md](docs/architecture.md), [AGENTS.md](AGENTS.md)
 - Exact byte duplicates only (size → 64 KB prefix → SHA-256)
 - Zip listing without extract; nested zip listed, not exploded
 - New library tree via **copy** (or hardlink on the same volume)
-- Quarantine extras; **no delete**
+- Quarantine extras; **no delete** in the library pipeline
 - Layout is a named template per source, not inferred
+- Optional **`lam actions`** JSON runner (separate from the pipeline) to
+  move / copy / mkdir / recycle with a dry run, `--apply`, and an undo log
 
 Not in v0.1: Foundry/Roll20 awareness, perceptual hash, embeddings,
 auto-tagging, clustering as folder names.
@@ -96,6 +98,35 @@ lam plan
 lam apply --yes
 ```
 
+### File-action plans (`lam actions`)
+
+A planner (a person, a script, or a local model) writes a JSON plan
+(`file-action-plan/v1`). The runner validates it, dry-runs every pre-check
+by default, and executes only with `--apply`. Nothing is overwritten.
+`recycle` sends items to the Windows Recycle Bin; there is no permanent
+delete. Paths under a `.git` directory are refused. `--apply` appends an
+undo CSV (`MOVE` / `COPY` / `RECYCLE` / `MKDIR`) next to the results file.
+
+This command does **not** use `library.jsonc` and does **not** change how
+`lam apply` or `never_modify_sources` behave.
+
+```powershell
+# Dry run (default): writes results JSON only
+python -m lam actions run examples\file-action-plan.sample.json
+
+# Execute, with optional output paths
+python -m lam actions run plan.json --apply --results results.json --undo-log undo.csv
+
+# Replay an undo log (dry run, then execute)
+python -m lam actions undo undo.csv
+python -m lam actions undo undo.csv --apply
+```
+
+Sample plan and results: [examples/file-action-plan.sample.json](examples/file-action-plan.sample.json),
+[examples/file-action-results.sample.json](examples/file-action-results.sample.json).
+Schema files: `lam/schemas/file-action-plan.v1.schema.json` and
+`lam/schemas/file-action-results.v1.schema.json`.
+
 Or create it from the UI with no file at all:
 
 ```text
@@ -163,9 +194,12 @@ This is a **home/LAN** tool. Do not put it on the public internet.
 - `scan` and `report` are read-only
 - `plan` writes a plan into the index DB, not the library tree
 - **No copies until you approve:** `lam apply --yes` or the UI checkbox
-- No delete in v0.1
-- Sources are left untouched when `never_modify_sources` is true
+- No delete in the library pipeline (v0.1). `lam apply` still never
+  modifies sources when `never_modify_sources` is true
 - `protect_paths` (optional) blocks writes outside the library and quarantine
+- `lam actions` is a separate opt-in runner: dry-run default, `--apply` to
+  execute, never overwrite, Recycle Bin not delete, `.git` paths refused,
+  undo log on apply
 
 ## License
 

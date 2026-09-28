@@ -10,7 +10,8 @@ product. The browser is a remote control, not the hasher.
 - **Do** keep `library.jsonc` gitignored; put templates in `examples/`.
 - **Do** keep tests on `tmp_path` fixtures. Do not scan or write the operator’s
   real disks unless they name those paths and approve the write.
-- **Do not** add delete, pHash, embeddings, or VTT-specific logic in v0.1.
+- **Do not** add permanent delete, pHash, embeddings, or VTT-specific logic
+  in v0.1. Recycle (Recycle Bin) exists only on `lam actions` with `--apply`.
 - **Do not** put hashing or copies in JavaScript/WASM.
 
 ## Safety (writes)
@@ -18,10 +19,17 @@ product. The browser is a remote control, not the hasher.
 - `scan` / `report` / `plan` do not change source files.
 - `apply` copies (or hardlinks) only after **explicit user approval**
   (`lam apply --yes` or the UI confirm checkbox). No silent writes.
-- `apply.never_modify_sources` defaults to true.
+- `apply.never_modify_sources` defaults to true. The existing
+  `scan → report → plan → apply` pipeline still never deletes or modifies
+  sources.
 - Optional `protect_paths` in the config lists extra drives or folders that
   must not be written to. The configured `library_root` and `quarantine` stay
   the allowed write targets.
+- **`lam actions` is a separate opt-in runner**, not part of that pipeline.
+  Dry-run is the default. It moves, copies, creates directories, or sends
+  files to the Recycle Bin only with `--apply`. It never overwrites, never
+  writes under a `.git` path, and never permanently deletes. Recycle is the
+  Windows Recycle Bin (recoverable). `--apply` writes an undo CSV.
 
 ## Where truth lives
 
@@ -38,6 +46,9 @@ product. The browser is a remote control, not the hasher.
 
 `scan` (read-only index) → `report` → `plan` (dest paths only) → `apply`
 (copy/hardlink, needs confirm). No delete.
+
+`lam actions run PLAN.json` is a **separate** JSON file-action runner
+(`file-action-plan/v1`). Dry-run default; `--apply` executes. See README.
 
 ## Config
 

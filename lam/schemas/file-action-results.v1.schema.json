@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/file-action-results.v1.schema.json",
+  "title": "file-action-results/v1",
+  "description": "Outcome of a file-action plan run or an undo replay.",
+  "type": "object",
+  "required": ["schema", "plan", "mode", "started", "finished", "summary", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "file-action-results/v1" },
+    "plan": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["dry-run", "apply"] },
+    "started": { "type": "string", "minLength": 1 },
+    "finished": { "type": "string", "minLength": 1 },
+    "summary": { "$ref": "#/$defs/summary" },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/item" }
+    }
+  },
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "required": ["total", "ok", "would_ok", "failed", "would_fail", "skipped"],
+      "additionalProperties": false,
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "ok": { "type": "integer", "minimum": 0 },
+        "would_ok": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "would_fail": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": ["index", "op", "status", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "id": { "type": ["string", "null"] },
+        "op": { "enum": ["move", "copy", "recycle", "mkdir"] },
+        "src": { "type": ["string", "null"] },
+        "dst": { "type": ["string", "null"] },
+        "status": { "enum": ["ok", "would_ok", "failed", "would_fail", "skipped"] },
+        "reason": { "type": "string" },
+        "size": { "type": ["integer", "null"] },
+        "sha256": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

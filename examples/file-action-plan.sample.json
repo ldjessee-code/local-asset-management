@@ -1,0 +1,34 @@
+{
+  "schema": "file-action-plan/v1",
+  "created": "2026-09-28T13:26:00-04:00",
+  "created_by": "example",
+  "note": "Documentation only. Paths under C:\\Example do not exist. Dry-run this file; do not --apply it.",
+  "actions": [
+    {
+      "id": "mkdir-inbox",
+      "op": "mkdir",
+      "dst": "C:\\Example\\Library\\Inbox",
+      "note": "Create the destination folder (parents included)"
+    },
+    {
+      "id": "move-csv",
+      "op": "move",
+      "src": "C:\\Example\\Inbox\\route_table.csv",
+      "dst": "C:\\Example\\Library\\Inbox\\route_table.csv",
+      "sha256": "edab39699751c5b21265402ab7f2bbc879821c4f2a9db283064e4ede23d4a346",
+      "note": "Same shape as a Downloads triage MOVE"
+    },
+    {
+      "id": "copy-readme",
+      "op": "copy",
+      "src": "C:\\Example\\Inbox\\README.txt",
+      "dst": "C:\\Example\\Library\\Inbox\\README.txt"
+    },
+    {
+      "id": "recycle-scratch",
+      "op": "recycle",
+      "src": "C:\\Example\\Inbox\\scratch.tmp",
+      "note": "Recycle Bin, never a permanent delete"
+    }
+  ]
+}

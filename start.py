@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent
 VENV = ROOT / ".venv"
 MIN_PY = (3, 11)
 LAM_COMMANDS = frozenset(
-    {"scan", "report", "plan", "apply", "serve", "capabilities"}
+    {"scan", "report", "plan", "apply", "serve", "capabilities", "actions"}
 )
 
 

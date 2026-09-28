@@ -9,4 +9,5 @@ include start.ps1
 include start.sh
 recursive-include docs *
 recursive-include lam/web/static *
+recursive-include lam/schemas *
 recursive-include examples *

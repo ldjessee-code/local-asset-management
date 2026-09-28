@@ -20,6 +20,10 @@ sources on disk
                           (needs user approval; never deletes in v0.1)
 ```
 
+`lam actions` is a **separate** opt-in JSON runner (`lam.actions`), not a
+stage of this pipeline. It reads `file-action-plan/v1`, dry-runs by
+default, and executes only with `--apply`.
+
 The browser talks JSON to FastAPI. Jobs run in a background thread on the
 machine that can see the disks.
 
@@ -34,6 +38,8 @@ machine that can see the disks.
 | `lam.scan` | orchestrates walk + zip + hash + dupe groups |
 | `lam.layouts` | named dest templates |
 | `lam.plan` / `lam.apply` | destinations, then copy |
+| `lam.actions` | JSON file-action runner (dry-run / `--apply` / undo) |
+| `lam.schema_lite` | stdlib JSON Schema subset for those plans |
 | `lam.report` | markdown + JSON |
 | `lam.web.app` | FastAPI |
 | `lam.capabilities` | inventory for humans and AIs |

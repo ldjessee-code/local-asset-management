@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/file-action-plan.v1.schema.json",
+  "title": "file-action-plan/v1",
+  "description": "A versioned list of file actions. Paths must be absolute (enforced in code).",
+  "type": "object",
+  "required": ["schema", "actions"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "file-action-plan/v1" },
+    "created": { "type": "string", "minLength": 1 },
+    "created_by": { "type": "string", "minLength": 1 },
+    "note": { "type": "string" },
+    "actions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/action" }
+    }
+  },
+  "$defs": {
+    "action": {
+      "type": "object",
+      "required": ["op"],
+      "additionalProperties": false,
+      "properties": {
+        "op": { "enum": ["move", "copy", "recycle", "mkdir"] },
+        "src": { "type": "string", "minLength": 1 },
+        "dst": { "type": "string", "minLength": 1 },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "id": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "op": { "const": "move" } },
+            "required": ["op"]
+          },
+          "then": { "required": ["src", "dst"] }
+        },
+        {
+          "if": {
+            "properties": { "op": { "const": "copy" } },
+            "required": ["op"]
+          },
+          "then": { "required": ["src", "dst"] }
+        },
+        {
+          "if": {
+            "properties": { "op": { "const": "recycle" } },
+            "required": ["op"]
+          },
+          "then": { "required": ["src"] }
+        },
+        {
+          "if": {
+            "properties": { "op": { "const": "mkdir" } },
+            "required": ["op"]
+          },
+          "then": { "required": ["dst"] }
+        }
+      ]
+    }
+  }
+}

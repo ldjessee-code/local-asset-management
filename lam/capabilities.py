@@ -66,6 +66,16 @@ COMMANDS: tuple[dict[str, Any], ...] = (
         "summary": "Print this inventory (add --json for machine-readable).",
         "function": "lam.capabilities.describe_capabilities",
     },
+    {
+        "name": "actions",
+        "config_required": False,
+        "writes": True,
+        "summary": (
+            "Separate opt-in JSON file-action runner (move/copy/recycle/mkdir). "
+            "Dry-run default; --apply executes. Never overwrites. Recycle Bin, not delete."
+        ),
+        "function": "lam.actions.run_file_actions",
+    },
 )
 
 MODULES: tuple[dict[str, str], ...] = (
@@ -75,6 +85,10 @@ MODULES: tuple[dict[str, str], ...] = (
     {"module": "lam.zips", "role": "List zip entries; nested zip listed, not exploded to disk"},
     {"module": "lam.plan", "role": "Layout templates → dest paths; quarantine extras"},
     {"module": "lam.apply", "role": "Copy/hardlink into library_root and quarantine"},
+    {
+        "module": "lam.actions",
+        "role": "Opt-in JSON file-action runner (dry-run default, --apply, undo log)",
+    },
     {"module": "lam.report", "role": "Markdown + JSON summary of the index"},
     {"module": "lam.web.app", "role": "FastAPI UI and job API over the same engine"},
     {"module": "lam.cli", "role": "lam command entrypoint"},
@@ -106,6 +120,8 @@ PUBLIC_PYTHON: tuple[str, ...] = (
     "lam.write_reports",
     "lam.run_plan",
     "lam.run_apply",
+    "lam.run_file_actions",
+    "lam.undo_file_actions",
     "lam.describe_capabilities",
     "lam.web.app.create_app",
 )
@@ -142,6 +158,19 @@ def describe_capabilities() -> dict[str, Any]:
             "apply_needs_confirm": True,
             "protect_paths": "optional extra roots apply will not write into",
             "not_in_v1": list(NOT_IN_V1),
+            "file_actions": {
+                "schema": "file-action-plan/v1",
+                "results_schema": "file-action-results/v1",
+                "command": "lam actions run PLAN.json",
+                "undo_command": "lam actions undo UNDO.csv",
+                "dry_run_default": True,
+                "needs_apply_flag": True,
+                "never_overwrite": True,
+                "recycle_not_delete": True,
+                "refuses_git_paths": True,
+                "writes_undo_log": True,
+                "separate_from_pipeline": True,
+            },
         },
         "modules": [dict(m) for m in MODULES],
         "http": [dict(h) for h in HTTP_API],

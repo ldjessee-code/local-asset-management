@@ -2,8 +2,8 @@
 """Command-line entry: ``lam`` or ``python -m lam``.
 
 ``scan`` / ``report`` / ``plan`` / ``apply`` need a config (default:
-``library.jsonc`` in the current directory). ``serve`` and ``capabilities``
-do not.
+``library.jsonc`` in the current directory). ``serve``, ``capabilities``,
+and ``actions`` do not.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 from lam.version import __version__
+from lam.actions import PlanError, run_file_actions, undo_file_actions
 from lam.apply import run_apply
 from lam.capabilities import describe_capabilities, format_capabilities_text
 from lam.config import ConfigError, find_default_config, load_config
@@ -23,6 +24,8 @@ from lam.jobs import human_progress
 from lam.plan import run_plan
 from lam.report import write_reports
 from lam.scan import run_scan
+
+NO_CONFIG_CMDS = frozenset({"serve", "capabilities", "actions"})
 
 SOURCE_URL = "https://github.com/ldjessee-code/local-asset-management"
 NO_CONFIG_HINT = (
@@ -64,6 +67,40 @@ def build_parser() -> argparse.ArgumentParser:
 
     caps = sub.add_parser("capabilities", help="What this program can do (for humans and AIs)")
     caps.add_argument("--json", action="store_true", help="Print JSON instead of text")
+
+    actions = sub.add_parser(
+        "actions",
+        help="Run or undo a JSON file-action plan (dry-run default; never overwrites)",
+    )
+    actions_sub = actions.add_subparsers(dest="actions_cmd", required=True)
+    run_p = actions_sub.add_parser(
+        "run",
+        help="Validate and run a file-action-plan/v1 JSON file (dry-run unless --apply)",
+    )
+    run_p.add_argument("plan", help="Path to a file-action-plan/v1 JSON file")
+    run_p.add_argument(
+        "--apply",
+        action="store_true",
+        help="Execute the plan. Default is a dry run that writes only the results JSON.",
+    )
+    run_p.add_argument("--results", help="Results JSON path (default: next to the plan, timestamped)")
+    run_p.add_argument("--undo-log", help="Undo CSV path (apply only; default: next to the results file)")
+    run_p.add_argument(
+        "--stop-on-error",
+        action="store_true",
+        help="Skip remaining items after the first failure",
+    )
+    undo_p = actions_sub.add_parser(
+        "undo",
+        help="Replay an undo CSV in reverse (dry-run unless --apply)",
+    )
+    undo_p.add_argument("undo_csv", help="Undo log CSV written by a previous --apply run")
+    undo_p.add_argument(
+        "--apply",
+        action="store_true",
+        help="Execute the undo. Default is a dry run that writes only the results JSON.",
+    )
+    undo_p.add_argument("--results", help="Results JSON path (default: next to the undo log, timestamped)")
     return p
 
 
@@ -81,10 +118,39 @@ def resolve_config_path(explicit: str | None, *, required: bool) -> Path | None:
     return None
 
 
+def _actions_command(args: argparse.Namespace) -> int:
+    try:
+        if args.actions_cmd == "run":
+            _results, code = run_file_actions(
+                Path(args.plan),
+                apply=args.apply,
+                results_path=Path(args.results) if args.results else None,
+                undo_log_path=Path(args.undo_log) if args.undo_log else None,
+                stop_on_error=args.stop_on_error,
+            )
+            return code
+        if args.actions_cmd == "undo":
+            _results, code = undo_file_actions(
+                Path(args.undo_csv),
+                apply=args.apply,
+                results_path=Path(args.results) if args.results else None,
+            )
+            return code
+    except PlanError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    except OSError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    return 2
+
+
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
+    if args.cmd == "actions":
+        raise SystemExit(_actions_command(args))
     try:
-        cfg_path = resolve_config_path(args.config, required=(args.cmd not in {"serve", "capabilities"}))
+        cfg_path = resolve_config_path(args.config, required=(args.cmd not in NO_CONFIG_CMDS))
         cfg = load_config(cfg_path) if cfg_path else None
     except ConfigError as exc:
         raise SystemExit(str(exc)) from exc
