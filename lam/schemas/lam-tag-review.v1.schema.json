@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/lam-tag-review.v1.schema.json",
+  "title": "lam-tag-review/v1",
+  "description": "Files a lam tag plan left in place. Sibling of the file-action plan.",
+  "type": "object",
+  "required": ["schema", "created", "plan", "level", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "lam-tag-review/v1" },
+    "created": { "type": "string", "minLength": 1 },
+    "plan": { "type": "string", "minLength": 1 },
+    "level": { "type": "integer", "minimum": 1, "maximum": 2 },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/item" }
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "required": ["rel", "abs", "bin", "subbin", "confidence", "reason", "batch", "copy_group"],
+      "additionalProperties": false,
+      "properties": {
+        "rel": { "type": "string", "minLength": 1 },
+        "abs": { "type": "string", "minLength": 1 },
+        "bin": { "type": "string", "minLength": 1 },
+        "subbin": { "type": ["string", "null"] },
+        "confidence": { "enum": ["high", "low", "unsure"] },
+        "reason": { "type": "string", "minLength": 1 },
+        "batch": { "type": "string", "minLength": 1 },
+        "copy_group": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

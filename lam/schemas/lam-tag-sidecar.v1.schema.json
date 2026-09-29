@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/lam-tag-sidecar.v1.schema.json",
+  "title": "lam-tag-sidecar/v1",
+  "description": "Per-file XMP/IPTC-style fields written next to a lam-tags/v1 file. Source files are not modified.",
+  "type": "object",
+  "required": ["schema", "created", "tags", "files"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "lam-tag-sidecar/v1" },
+    "created": { "type": "string", "minLength": 1 },
+    "tags": { "type": "string", "minLength": 1 },
+    "files": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/record" }
+    }
+  },
+  "$defs": {
+    "record": {
+      "type": "object",
+      "required": [
+        "file",
+        "dc:subject",
+        "xmp:Label",
+        "xmp:Rating",
+        "lam:confidence",
+        "lam:rule",
+        "lam:model",
+        "lam:batch",
+        "lam:copy_group",
+        "xmp:MetadataDate"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "file": { "type": "string", "minLength": 1 },
+        "dc:subject": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "xmp:Label": { "type": "string", "minLength": 1 },
+        "xmp:Rating": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "lam:confidence": { "enum": ["high", "low", "unsure"] },
+        "lam:rule": { "type": "string", "minLength": 1 },
+        "lam:model": { "type": "string", "minLength": 1 },
+        "lam:batch": { "type": "string", "minLength": 1 },
+        "lam:copy_group": { "type": ["string", "null"] },
+        "xmp:MetadataDate": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

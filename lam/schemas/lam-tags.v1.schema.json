@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/lam-tags.v1.schema.json",
+  "title": "lam-tags/v1",
+  "description": "One layered-sorter pass. Paths are records only; this file does not move anything.",
+  "type": "object",
+  "required": [
+    "schema",
+    "root",
+    "level",
+    "bin",
+    "created",
+    "model",
+    "model_url",
+    "burst_window_seconds",
+    "max_image_bytes",
+    "weight_min_bytes",
+    "files"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "lam-tags/v1" },
+    "root": { "type": "string", "minLength": 1 },
+    "level": { "type": "integer", "minimum": 1, "maximum": 2 },
+    "bin": { "type": ["string", "null"] },
+    "created": { "type": "string", "minLength": 1 },
+    "model": { "type": "string", "minLength": 1 },
+    "model_url": { "type": ["string", "null"] },
+    "burst_window_seconds": { "type": "integer", "minimum": 0 },
+    "max_image_bytes": { "type": "integer", "minimum": 0 },
+    "weight_min_bytes": { "type": "integer", "minimum": 0 },
+    "files": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/file" }
+    }
+  },
+  "$defs": {
+    "file": {
+      "type": "object",
+      "required": [
+        "rel",
+        "abs",
+        "size",
+        "extension",
+        "mtime",
+        "sha256",
+        "copy_group",
+        "batch",
+        "bin",
+        "subbin",
+        "confidence",
+        "rule",
+        "model_label",
+        "notes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rel": { "type": "string", "minLength": 1 },
+        "abs": { "type": "string", "minLength": 1 },
+        "size": { "type": "integer", "minimum": 0 },
+        "extension": { "type": "string" },
+        "mtime": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "copy_group": { "type": ["string", "null"] },
+        "batch": { "type": "string", "minLength": 1 },
+        "bin": {
+          "enum": [
+            "_Maps",
+            "_GameMods",
+            "_Installers",
+            "_Documents",
+            "_ModelWeights",
+            "_Images",
+            "_Archives",
+            "_Unknown"
+          ]
+        },
+        "subbin": { "type": ["string", "null"] },
+        "confidence": { "enum": ["high", "low", "unsure"] },
+        "rule": { "type": "string", "minLength": 1 },
+        "model_label": { "type": ["string", "null"] },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

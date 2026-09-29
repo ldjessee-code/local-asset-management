@@ -44,6 +44,7 @@ product. The browser is a remote control, not the hasher.
 | JSON file-action plan / results format | `docs/file-action-plan.md`, `lam/schemas/` |
 | Site session cookies (`lam token`) | `docs/token-fetcher.md`, `lam/token/` |
 | Patreon list / sync formats | `docs/patreon-sync.md`, `lam/schemas/registry.py`, `lam/patreon/` |
+| Layered sorting (`lam tag`) | `docs/layered-sorting.md`, `lam/tag/` |
 | License | `LICENSE` (AGPL-3.0-or-later, unmodified FSF text) |
 
 ## JSON formats
@@ -85,6 +86,19 @@ Dry-run is the default. `--apply` writes `F:\PatreonDL\<Creator>\_inbox_yyyyMMdd
 and the manifest only. It does not expand zips and does not write Dropbox
 `/Gaming`. The sample config stages under `C:\Example`, which is refused.
 
+### Layered sorting (`lam tag`)
+
+`lam tag scan` writes a tag document. `lam tag plan` writes one
+`file-action-plan/v1` plus a review sibling. Neither command moves files.
+Field reference: `docs/layered-sorting.md`. Registry: `lam/schemas/registry.py`.
+
+- Tags: `lam/schemas/lam-tags.v1.schema.json` (`lam-tags/v1`)
+- Sub-bins: `lam/schemas/lam-subbins.v1.schema.json` (`lam-subbins/v1`)
+- Sidecar: `lam/schemas/lam-tag-sidecar.v1.schema.json` (`lam-tag-sidecar/v1`)
+- Review list: `lam/schemas/lam-tag-review.v1.schema.json` (`lam-tag-review/v1`)
+
+Sample sub-bins (placeholder names only): `examples/subbins.sample.json`.
+
 ## Secrets and browser profiles
 
 Never print, log, commit, or put in a report a cookie value, or any slice
@@ -123,6 +137,21 @@ on a command line.
 | Dedupe, no overwrite, manifest/index schemas, no permanent delete | `tests/patreon/test_g13_duplicates.py`, `tests/patreon/test_g14_manifest_index.py`, `tests/patreon/test_g18_never_delete.py` |
 | Gates 3–7, rate limit, Chronos exclusion | `tests/patreon/test_g15_gates.py`, `tests/patreon/test_g16_rate.py`, `tests/patreon/test_g17_chronos.py` |
 | Registry, capabilities, and this file name the schema ids | `tests/patreon/test_g19_registry.py`, `tests/patreon/test_g20_docs.py` |
+
+## Proof (layered sorting)
+
+`pytest` collects `tests/tag/`. Tag tests block real sockets.
+
+| Claim | Where |
+|---|---|
+| Scan fields, SHA-256, copy groups, batches, burst window, `.git` and symlink skip | `tests/tag/test_scan.py` |
+| Each level-1 rule and level-2 hints | `tests/tag/test_rules.py` |
+| Model cascade (agree, disagree, Unsure, same answer twice, unreachable, request body, `qwen3.8` refused) | `tests/tag/test_model.py` |
+| Plan moves only high confidence, keeps batches together, recycles extra copies, no overwrite, dry-run | `tests/tag/test_plan.py` |
+| Level 2 sub-bins; unknown schema ids exit 2 | `tests/tag/test_level2.py` |
+| Sidecar field names; ExifTool missing and fake runner | `tests/tag/test_sidecar.py` |
+| New schema ids in the registry and `lam capabilities` | `tests/tag/test_capabilities.py` |
+| This file and `docs/layered-sorting.md` name the schema ids | `tests/tag/test_docs.py` |
 
 ## Pipeline
 

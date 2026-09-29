@@ -19,6 +19,10 @@ from lam.schemas.registry import (
     RESULTS_SCHEMAS,
     SITE_PROFILES_SCHEMA_ID,
     SITE_PROFILES_SCHEMAS,
+    SUBBINS_SCHEMAS,
+    TAG_REVIEW_SCHEMAS,
+    TAG_SIDECAR_SCHEMAS,
+    TAGS_SCHEMAS,
     status_groups,
 )
 from lam.version import __version__
@@ -107,6 +111,16 @@ COMMANDS: tuple[dict[str, Any], ...] = (
         ),
         "function": "lam.patreon.cli.run_patreon_command",
     },
+    {
+        "name": "tag",
+        "config_required": False,
+        "writes": True,
+        "summary": (
+            "Layered file sorter (lam tag scan|plan). Writes a reviewable "
+            "file-action plan and a sidecar. Does not move files."
+        ),
+        "function": "lam.tag.cli.run_tag_command",
+    },
 )
 
 MODULES: tuple[dict[str, str], ...] = (
@@ -130,6 +144,10 @@ MODULES: tuple[dict[str, str], ...] = (
     {
         "module": "lam.patreon",
         "role": "Patreon list/sync/validate-config (staging inbox and manifest only)",
+    },
+    {
+        "module": "lam.tag",
+        "role": "Layered sorter: lam tag scan and lam tag plan (plan only, no apply)",
     },
 )
 
@@ -241,6 +259,19 @@ def describe_capabilities() -> dict[str, Any]:
             "sync": "lam patreon sync --creators CREATORS.json",
             "validate": "lam patreon validate-config CREATORS.json",
         },
+        "tag": {
+            "command": "lam tag",
+            "docs": "docs/layered-sorting.md",
+            "schema_registry": "lam/schemas/registry.py",
+            "tags_schema_ids": status_groups(TAGS_SCHEMAS),
+            "subbins_schema_ids": status_groups(SUBBINS_SCHEMAS),
+            "sidecar_schema_ids": status_groups(TAG_SIDECAR_SCHEMAS),
+            "review_schema_ids": status_groups(TAG_REVIEW_SCHEMAS),
+            "scan": "lam tag scan FOLDER --out tags.json",
+            "plan": "lam tag plan tags.json --dest ROOT --level 1 --out plan.json",
+            "dry_run_default": True,
+            "never_moves_files": True,
+        },
         "modules": [dict(m) for m in MODULES],
         "http": [dict(h) for h in HTTP_API],
         "public_python": list(PUBLIC_PYTHON),
@@ -308,6 +339,13 @@ def format_capabilities_text(data: dict[str, Any] | None = None) -> str:
         "post_list_schema_ids",
     ):
         groups = patreon[key]
+        supported = ", ".join(groups["supported"]) or "(none)"
+        deprecated = ", ".join(groups["deprecated"]) if groups["deprecated"] else "(none)"
+        lines.append(f"  {key}: supported: {supported}; deprecated: {deprecated}")
+    tag = cap["tag"]
+    lines += ["", "Tag schemas:"]
+    for key in ("tags_schema_ids", "subbins_schema_ids", "sidecar_schema_ids", "review_schema_ids"):
+        groups = tag[key]
         supported = ", ".join(groups["supported"]) or "(none)"
         deprecated = ", ".join(groups["deprecated"]) if groups["deprecated"] else "(none)"
         lines.append(f"  {key}: supported: {supported}; deprecated: {deprecated}")

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/lam-subbins.v1.schema.json",
+  "title": "lam-subbins/v1",
+  "description": "Court-supplied sub-bins for one parent bin. The program has no built-in game, vendor, or genre list.",
+  "type": "object",
+  "required": ["schema", "bin", "subbins"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "lam-subbins/v1" },
+    "bin": { "type": "string", "minLength": 1 },
+    "subbins": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/subbin" }
+    }
+  },
+  "$defs": {
+    "subbin": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "hints": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

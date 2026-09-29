@@ -25,9 +25,10 @@ from lam.plan import run_plan
 from lam.report import write_reports
 from lam.scan import run_scan
 from lam.patreon.cli import add_patreon_parser, run_patreon_command
+from lam.tag.cli import add_tag_parser, run_tag_command
 from lam.token.cli import add_token_parser, run_token_command
 
-NO_CONFIG_CMDS = frozenset({"serve", "capabilities", "actions", "token", "patreon"})
+NO_CONFIG_CMDS = frozenset({"serve", "capabilities", "actions", "token", "patreon", "tag"})
 
 SOURCE_URL = "https://github.com/ldjessee-code/local-asset-management"
 NO_CONFIG_HINT = (
@@ -105,6 +106,7 @@ def build_parser() -> argparse.ArgumentParser:
     undo_p.add_argument("--results", help="Results JSON path (default: next to the undo log, timestamped)")
     add_token_parser(sub)
     add_patreon_parser(sub)
+    add_tag_parser(sub)
     return p
 
 
@@ -157,6 +159,8 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(run_token_command(args))
     if args.cmd == "patreon":
         raise SystemExit(run_patreon_command(args))
+    if args.cmd == "tag":
+        raise SystemExit(run_tag_command(args))
     try:
         cfg_path = resolve_config_path(args.config, required=(args.cmd not in NO_CONFIG_CMDS))
         cfg = load_config(cfg_path) if cfg_path else None

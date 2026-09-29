@@ -207,6 +207,22 @@ Optional `protect_paths` lists extra drives or folders that apply will
 refuse to write into. The configured library and quarantine remain the
 allowed write targets.
 
+### Layered sorting (`lam tag`)
+
+`lam tag scan` walks one folder and writes `lam-tags/v1` (rules, then an
+optional local model). `lam tag plan` writes a `file-action-plan/v1` plus a
+review list. It does not move files. Review the plan, then dry-run it with
+`lam actions run`. `--apply` is a separate step you choose later.
+Level 2 needs a sub-bin list you supply (`lam-subbins/v1`); there is no
+built-in game or vendor list. Details:
+[docs/layered-sorting.md](docs/layered-sorting.md).
+
+```text
+lam tag scan D:\incoming --no-model --out tags.json
+lam tag plan tags.json --dest D:\library --level 1 --out plan.json
+lam actions run plan.json
+```
+
 ## Web UI
 
 The engine process serves the UI. Open it from a laptop or a phone on

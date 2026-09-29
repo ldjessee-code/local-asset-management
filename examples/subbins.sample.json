@@ -1,0 +1,16 @@
+{
+  "schema": "lam-subbins/v1",
+  "bin": "_Maps",
+  "subbins": [
+    {
+      "name": "SubA",
+      "description": "Neutral placeholder group A",
+      "hints": ["alpha"]
+    },
+    {
+      "name": "SubB",
+      "description": "Neutral placeholder group B",
+      "hints": ["beta"]
+    }
+  ]
+}

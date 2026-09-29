@@ -23,6 +23,10 @@ PATREON_CREATORS_SCHEMA_ID = "patreon-creators/v1"
 PATREON_MANIFEST_SCHEMA_ID = "patreon-drop-manifest/v1"
 PATREON_INDEX_SCHEMA_ID = "patreon-index/v1"
 PATREON_POST_LIST_SCHEMA_ID = "patreon-post-list/v1"
+TAGS_SCHEMA_ID = "lam-tags/v1"
+SUBBINS_SCHEMA_ID = "lam-subbins/v1"
+TAG_SIDECAR_SCHEMA_ID = "lam-tag-sidecar/v1"
+TAG_REVIEW_SCHEMA_ID = "lam-tag-review/v1"
 
 STATUS_SUPPORTED = "supported"
 STATUS_DEPRECATED = "deprecated"
@@ -112,6 +116,42 @@ PATREON_POST_LIST_SCHEMAS: dict[str, SchemaEntry] = {
     ),
 }
 
+TAGS_SCHEMAS: dict[str, SchemaEntry] = {
+    TAGS_SCHEMA_ID: SchemaEntry(
+        schema_id=TAGS_SCHEMA_ID,
+        kind="tags",
+        status=STATUS_SUPPORTED,
+        filename="lam-tags.v1.schema.json",
+    ),
+}
+
+SUBBINS_SCHEMAS: dict[str, SchemaEntry] = {
+    SUBBINS_SCHEMA_ID: SchemaEntry(
+        schema_id=SUBBINS_SCHEMA_ID,
+        kind="subbins",
+        status=STATUS_SUPPORTED,
+        filename="lam-subbins.v1.schema.json",
+    ),
+}
+
+TAG_SIDECAR_SCHEMAS: dict[str, SchemaEntry] = {
+    TAG_SIDECAR_SCHEMA_ID: SchemaEntry(
+        schema_id=TAG_SIDECAR_SCHEMA_ID,
+        kind="tag-sidecar",
+        status=STATUS_SUPPORTED,
+        filename="lam-tag-sidecar.v1.schema.json",
+    ),
+}
+
+TAG_REVIEW_SCHEMAS: dict[str, SchemaEntry] = {
+    TAG_REVIEW_SCHEMA_ID: SchemaEntry(
+        schema_id=TAG_REVIEW_SCHEMA_ID,
+        kind="tag-review",
+        status=STATUS_SUPPORTED,
+        filename="lam-tag-review.v1.schema.json",
+    ),
+}
+
 KIND_LABELS = {
     "plan": "plan",
     "results": "results",
@@ -120,6 +160,10 @@ KIND_LABELS = {
     "patreon-drop-manifest": "patreon-drop-manifest",
     "patreon-index": "patreon-index",
     "patreon-post-list": "patreon-post-list",
+    "tags": "tags",
+    "subbins": "subbins",
+    "tag-sidecar": "tag-sidecar",
+    "tag-review": "tag-review",
 }
 
 

@@ -26,6 +26,10 @@ stage of this pipeline. It reads a registered plan schema (today
 default, and executes only with `--apply`. Field reference:
 [file-action-plan.md](file-action-plan.md).
 
+`lam tag` (`lam.tag`) is another opt-in planner. `scan` writes `lam-tags/v1`
+and a sidecar. `plan` writes one `file-action-plan/v1` plus a review list.
+It does not move files. See [layered-sorting.md](layered-sorting.md).
+
 The browser talks JSON to FastAPI. Jobs run in a background thread on the
 machine that can see the disks.
 
@@ -41,7 +45,7 @@ machine that can see the disks.
 | `lam.layouts` | named dest templates |
 | `lam.plan` / `lam.apply` | destinations, then copy |
 | `lam.actions` | JSON file-action runner (dry-run / `--apply` / undo) |
-| `lam.schemas.registry` | Plan, results, site-profiles, and patreon schema ids (`supported` / `deprecated` / `removed`) |
+| `lam.schemas.registry` | Plan, results, site-profiles, patreon, and tag schema ids (`supported` / `deprecated` / `removed`) |
 | `lam.schema_lite` | stdlib JSON Schema subset for those plans |
 | `lam.report` | markdown + JSON |
 | `lam.web.app` | FastAPI |
@@ -49,6 +53,7 @@ machine that can see the disks.
 | `lam.cli` | `lam` entry |
 | `lam.token` | Site session cookies via a persistent browser profile (`lam token`) |
 | `lam.patreon` | `lam patreon list`, `sync`, `validate-config` (inbox + manifest only) |
+| `lam.tag` | `lam tag scan` / `lam tag plan` layered sorter (writes a plan; does not move files) |
 
 Public imports are listed in `lam/__init__.py`. Prefer those over private
 helpers (`_log_jsonl`, SQL strings, …).
