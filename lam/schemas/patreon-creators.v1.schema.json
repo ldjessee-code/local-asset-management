@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/patreon-creators.v1.schema.json",
+  "title": "patreon-creators/v1",
+  "description": "Creators, filters, and staging root for lam patreon.",
+  "type": "object",
+  "required": ["schema", "creators"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "patreon-creators/v1" },
+    "staging_root": { "type": "string", "minLength": 1 },
+    "creators": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/creator" }
+    }
+  },
+  "$defs": {
+    "creator": {
+      "type": "object",
+      "required": ["slug", "patreon_url"],
+      "additionalProperties": false,
+      "properties": {
+        "slug": { "type": "string", "minLength": 1 },
+        "display_name": { "type": "string" },
+        "patreon_url": { "type": "string", "minLength": 1 },
+        "campaign_id": { "type": ["string", "null"] },
+        "staging_folder": { "type": "string", "minLength": 1 },
+        "enabled": { "type": "boolean" },
+        "filters": { "$ref": "#/$defs/filters" }
+      }
+    },
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include_title_regex": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "exclude_title_regex": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "published_after": { "type": "string" },
+        "media_types": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["attachment", "image"] }
+        },
+        "max_file_mb": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

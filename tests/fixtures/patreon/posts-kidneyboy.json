@@ -1,0 +1,132 @@
+{
+  "pages": [
+    {
+      "data": [
+        {
+          "id": "kb-181",
+          "type": "post",
+          "attributes": {
+            "title": "Harbor Keep",
+            "url": "https://example.invalid/posts/kb-181",
+            "published_at": "2026-09-18T15:00:00+00:00",
+            "current_user_can_view": true,
+            "content": ""
+          },
+          "relationships": {
+            "attachments": { "data": [{ "id": "att-harbor", "type": "attachment" }] },
+            "images": { "data": [] }
+          }
+        },
+        {
+          "id": "kb-602",
+          "type": "post",
+          "attributes": {
+            "title": "River Ford",
+            "url": "https://example.invalid/posts/kb-602",
+            "published_at": "2026-06-02T15:00:00+00:00",
+            "current_user_can_view": true,
+            "content": ""
+          },
+          "relationships": {
+            "attachments": { "data": [] },
+            "images": { "data": [{ "id": "img-river", "type": "media" }] }
+          }
+        },
+        {
+          "id": "kb-404",
+          "type": "post",
+          "attributes": {
+            "title": "Chronos Builder April",
+            "url": "https://example.invalid/posts/kb-404",
+            "published_at": "2026-04-04T15:00:00+00:00",
+            "current_user_can_view": true,
+            "content": ""
+          },
+          "relationships": { "attachments": { "data": [] }, "images": { "data": [] } }
+        },
+        {
+          "id": "kb-120",
+          "type": "post",
+          "attributes": {
+            "title": "Watchtower",
+            "url": "https://example.invalid/posts/kb-120",
+            "published_at": "2026-01-20T15:00:00+00:00",
+            "current_user_can_view": true,
+            "content": ""
+          },
+          "relationships": {
+            "attachments": { "data": [{ "id": "att-watch", "type": "attachment" }] },
+            "images": { "data": [] }
+          }
+        },
+        {
+          "id": "kb-1111",
+          "type": "post",
+          "attributes": {
+            "title": "Members Vault",
+            "url": "https://example.invalid/posts/kb-1111",
+            "published_at": "2025-11-11T15:00:00+00:00",
+            "current_user_can_view": false,
+            "content": ""
+          },
+          "relationships": {
+            "attachments": { "data": [{ "id": "att-secret", "type": "attachment" }] },
+            "images": { "data": [] }
+          }
+        },
+        {
+          "id": "kb-old",
+          "type": "post",
+          "attributes": {
+            "title": "Old Pack",
+            "url": "https://example.invalid/posts/kb-old",
+            "published_at": "2025-08-01T15:00:00+00:00",
+            "current_user_can_view": true,
+            "content": ""
+          },
+          "relationships": { "attachments": { "data": [] }, "images": { "data": [] } }
+        }
+      ],
+      "included": [
+        {
+          "id": "att-harbor",
+          "type": "attachment",
+          "attributes": {
+            "name": "harbor.zip",
+            "url": "https://example.invalid/files/harbor.zip",
+            "size": 4096
+          }
+        },
+        {
+          "id": "img-river",
+          "type": "media",
+          "attributes": {
+            "file_name": "ford.png",
+            "download_url": "https://example.invalid/files/ford.png",
+            "mimetype": "image/png",
+            "size_bytes": 2048
+          }
+        },
+        {
+          "id": "att-watch",
+          "type": "attachment",
+          "attributes": {
+            "name": "tower.zip",
+            "url": "https://example.invalid/files/tower.zip",
+            "size": 8192
+          }
+        },
+        {
+          "id": "att-secret",
+          "type": "attachment",
+          "attributes": {
+            "name": "secret.zip",
+            "url": "https://example.invalid/files/secret.zip",
+            "size": 100
+          }
+        }
+      ],
+      "links": {}
+    }
+  ]
+}

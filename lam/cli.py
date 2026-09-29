@@ -3,7 +3,7 @@
 
 ``scan`` / ``report`` / ``plan`` / ``apply`` need a config (default:
 ``library.jsonc`` in the current directory). ``serve``, ``capabilities``,
-and ``actions`` do not.
+``actions``, ``token``, and ``patreon`` do not.
 """
 
 from __future__ import annotations
@@ -24,8 +24,10 @@ from lam.jobs import human_progress
 from lam.plan import run_plan
 from lam.report import write_reports
 from lam.scan import run_scan
+from lam.patreon.cli import add_patreon_parser, run_patreon_command
+from lam.token.cli import add_token_parser, run_token_command
 
-NO_CONFIG_CMDS = frozenset({"serve", "capabilities", "actions"})
+NO_CONFIG_CMDS = frozenset({"serve", "capabilities", "actions", "token", "patreon"})
 
 SOURCE_URL = "https://github.com/ldjessee-code/local-asset-management"
 NO_CONFIG_HINT = (
@@ -101,6 +103,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Execute the undo. Default is a dry run that writes only the results JSON.",
     )
     undo_p.add_argument("--results", help="Results JSON path (default: next to the undo log, timestamped)")
+    add_token_parser(sub)
+    add_patreon_parser(sub)
     return p
 
 
@@ -149,6 +153,10 @@ def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     if args.cmd == "actions":
         raise SystemExit(_actions_command(args))
+    if args.cmd == "token":
+        raise SystemExit(run_token_command(args))
+    if args.cmd == "patreon":
+        raise SystemExit(run_patreon_command(args))
     try:
         cfg_path = resolve_config_path(args.config, required=(args.cmd not in NO_CONFIG_CMDS))
         cfg = load_config(cfg_path) if cfg_path else None

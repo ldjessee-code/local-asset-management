@@ -1,0 +1,34 @@
+{
+  "schema": "patreon-drop-manifest/v1",
+  "creator_slug": "Kidney_Boy",
+  "run_started": "2026-10-01T12:00:00-04:00",
+  "run_finished": "2026-10-01T12:00:02-04:00",
+  "mode": "dry-run",
+  "staging_path": "C:\\Example\\PatreonDL\\Kidney_Boy\\_inbox_20261001",
+  "warnings": [],
+  "ready_summary": "Kidney_Boy: 1 posts, 1 files (1 zip, 0 image), 1 MB staged in C:\\Example\\PatreonDL\\Kidney_Boy\\_inbox_20261001 - ready for notLib expand",
+  "gate": null,
+  "posts": [
+    {
+      "post_id": "post-fake-1",
+      "post_title": "Fake Harbor Keep",
+      "post_url": "https://example.invalid/posts/post-fake-1",
+      "published": "2026-09-18T15:00:00+00:00",
+      "status": "planned",
+      "reason": "",
+      "files": [
+        {
+          "name": "harbor.zip",
+          "staging_path": "C:\\Example\\PatreonDL\\Kidney_Boy\\_inbox_20261001\\post-fake-1_Fake Harbor Keep\\harbor.zip",
+          "size": 1048576,
+          "sha256": null,
+          "kind": "zip",
+          "downloaded_at": null,
+          "status": "planned",
+          "url": "https://example.invalid/files/harbor.zip",
+          "host": "example.invalid"
+        }
+      ]
+    }
+  ]
+}

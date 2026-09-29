@@ -41,12 +41,14 @@ machine that can see the disks.
 | `lam.layouts` | named dest templates |
 | `lam.plan` / `lam.apply` | destinations, then copy |
 | `lam.actions` | JSON file-action runner (dry-run / `--apply` / undo) |
-| `lam.schemas.registry` | Plan and results schema ids (`supported` / `deprecated` / `removed`) |
+| `lam.schemas.registry` | Plan, results, site-profiles, and patreon schema ids (`supported` / `deprecated` / `removed`) |
 | `lam.schema_lite` | stdlib JSON Schema subset for those plans |
 | `lam.report` | markdown + JSON |
 | `lam.web.app` | FastAPI |
 | `lam.capabilities` | inventory for humans and AIs |
 | `lam.cli` | `lam` entry |
+| `lam.token` | Site session cookies via a persistent browser profile (`lam token`) |
+| `lam.patreon` | `lam patreon list`, `sync`, `validate-config` (inbox + manifest only) |
 
 Public imports are listed in `lam/__init__.py`. Prefer those over private
 helpers (`_log_jsonl`, SQL strings, …).

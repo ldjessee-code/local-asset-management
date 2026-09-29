@@ -1,0 +1,7 @@
+{
+  "data": {
+    "id": "user-fixture",
+    "type": "user",
+    "attributes": { "full_name": "Fixture Patron" }
+  }
+}

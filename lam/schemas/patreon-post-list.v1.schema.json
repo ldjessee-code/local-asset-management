@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/patreon-post-list.v1.schema.json",
+  "title": "patreon-post-list/v1",
+  "description": "Read-only post list for lam patreon list.",
+  "type": "object",
+  "required": ["schema", "generated", "window", "creators", "warnings", "gate"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "patreon-post-list/v1" },
+    "generated": { "type": "string" },
+    "window": {
+      "type": "object",
+      "required": ["since", "until", "timezone"],
+      "additionalProperties": false,
+      "properties": {
+        "since": { "type": ["string", "null"] },
+        "until": { "type": "string" },
+        "timezone": { "type": "string" }
+      }
+    },
+    "creators": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/creator" }
+    },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "gate": { "type": ["object", "null"] }
+  },
+  "$defs": {
+    "creator": {
+      "type": "object",
+      "required": ["slug", "vanity", "summary", "not_a_member", "counts", "posts", "warnings"],
+      "additionalProperties": false,
+      "properties": {
+        "slug": { "type": "string" },
+        "vanity": { "type": "string" },
+        "summary": { "type": "string" },
+        "not_a_member": { "type": "boolean" },
+        "counts": { "$ref": "#/$defs/counts" },
+        "posts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/post" }
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": ["accessible", "locked", "excluded", "deferred", "listed"],
+      "additionalProperties": false,
+      "properties": {
+        "accessible": { "type": "integer" },
+        "locked": { "type": "integer" },
+        "excluded": { "type": "integer" },
+        "deferred": { "type": "integer" },
+        "listed": { "type": "integer" }
+      }
+    },
+    "post": {
+      "type": "object",
+      "required": ["post_id", "post_title", "post_url", "published", "access", "attachments", "images", "outside_links"],
+      "additionalProperties": false,
+      "properties": {
+        "post_id": { "type": "string" },
+        "post_title": { "type": "string" },
+        "post_url": { "type": "string" },
+        "published": { "type": ["string", "null"] },
+        "access": { "type": "string" },
+        "attachments": { "type": "integer" },
+        "images": { "type": "integer" },
+        "outside_links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["host", "url"],
+            "additionalProperties": false,
+            "properties": {
+              "host": { "type": "string" },
+              "url": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

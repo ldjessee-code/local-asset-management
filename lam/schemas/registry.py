@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Registry of file-action plan and results schema ids.
+"""Registry of versioned JSON schema ids.
 
 A new version is a new schema file plus an entry here. An id stays
 ``supported`` until it is marked ``deprecated`` (with a removal note), then
-``removed`` in a later release. ``lam.actions`` dispatches validation on the
-document's ``schema`` field. Unknown and removed ids fail before anything runs.
+``removed`` in a later release. Dispatchers validate on the document's
+``schema`` field. Unknown and removed ids fail before anything runs.
 """
 
 from __future__ import annotations
@@ -18,6 +18,11 @@ SCHEMA_DIR = Path(__file__).resolve().parent
 
 PLAN_SCHEMA_ID = "file-action-plan/v1"
 RESULTS_SCHEMA_ID = "file-action-results/v1"
+SITE_PROFILES_SCHEMA_ID = "lam-site-profiles/v1"
+PATREON_CREATORS_SCHEMA_ID = "patreon-creators/v1"
+PATREON_MANIFEST_SCHEMA_ID = "patreon-drop-manifest/v1"
+PATREON_INDEX_SCHEMA_ID = "patreon-index/v1"
+PATREON_POST_LIST_SCHEMA_ID = "patreon-post-list/v1"
 
 STATUS_SUPPORTED = "supported"
 STATUS_DEPRECATED = "deprecated"
@@ -62,6 +67,61 @@ RESULTS_SCHEMAS: dict[str, SchemaEntry] = {
     ),
 }
 
+SITE_PROFILES_SCHEMAS: dict[str, SchemaEntry] = {
+    SITE_PROFILES_SCHEMA_ID: SchemaEntry(
+        schema_id=SITE_PROFILES_SCHEMA_ID,
+        kind="site-profiles",
+        status=STATUS_SUPPORTED,
+        filename="site-profiles.v1.schema.json",
+    ),
+}
+
+PATREON_CREATORS_SCHEMAS: dict[str, SchemaEntry] = {
+    PATREON_CREATORS_SCHEMA_ID: SchemaEntry(
+        schema_id=PATREON_CREATORS_SCHEMA_ID,
+        kind="patreon-creators",
+        status=STATUS_SUPPORTED,
+        filename="patreon-creators.v1.schema.json",
+    ),
+}
+
+PATREON_MANIFEST_SCHEMAS: dict[str, SchemaEntry] = {
+    PATREON_MANIFEST_SCHEMA_ID: SchemaEntry(
+        schema_id=PATREON_MANIFEST_SCHEMA_ID,
+        kind="patreon-drop-manifest",
+        status=STATUS_SUPPORTED,
+        filename="patreon-drop-manifest.v1.schema.json",
+    ),
+}
+
+PATREON_INDEX_SCHEMAS: dict[str, SchemaEntry] = {
+    PATREON_INDEX_SCHEMA_ID: SchemaEntry(
+        schema_id=PATREON_INDEX_SCHEMA_ID,
+        kind="patreon-index",
+        status=STATUS_SUPPORTED,
+        filename="patreon-index.v1.schema.json",
+    ),
+}
+
+PATREON_POST_LIST_SCHEMAS: dict[str, SchemaEntry] = {
+    PATREON_POST_LIST_SCHEMA_ID: SchemaEntry(
+        schema_id=PATREON_POST_LIST_SCHEMA_ID,
+        kind="patreon-post-list",
+        status=STATUS_SUPPORTED,
+        filename="patreon-post-list.v1.schema.json",
+    ),
+}
+
+KIND_LABELS = {
+    "plan": "plan",
+    "results": "results",
+    "site-profiles": "site-profiles",
+    "patreon-creators": "patreon-creators",
+    "patreon-drop-manifest": "patreon-drop-manifest",
+    "patreon-index": "patreon-index",
+    "patreon-post-list": "patreon-post-list",
+}
+
 
 def ids_with_status(table: dict[str, SchemaEntry], status: str) -> list[str]:
     return [entry.schema_id for entry in table.values() if entry.status == status]
@@ -77,7 +137,7 @@ def status_groups(table: dict[str, SchemaEntry]) -> dict[str, list[str]]:
 
 def unsupported_message(kind: str, schema_id: object, table: dict[str, SchemaEntry]) -> str:
     """Exact failure text for an unknown or removed schema id."""
-    label = "plan" if kind == "plan" else "results"
+    label = KIND_LABELS.get(kind, kind)
     shown = schema_id if isinstance(schema_id, str) else repr(schema_id)
     supported = ", ".join(ids_with_status(table, STATUS_SUPPORTED)) or "(none)"
     message = f"unsupported {label} schema {shown}; supported: {supported}"
@@ -89,5 +149,5 @@ def unsupported_message(kind: str, schema_id: object, table: dict[str, SchemaEnt
 
 def deprecation_warning(entry: SchemaEntry) -> str:
     note = entry.removal_note or "it will be removed in a later release"
-    label = "plan" if entry.kind == "plan" else "results"
+    label = KIND_LABELS.get(entry.kind, entry.kind)
     return f"{label} schema {entry.schema_id} is deprecated; {note}"

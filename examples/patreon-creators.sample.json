@@ -1,0 +1,28 @@
+{
+  "schema": "patreon-creators/v1",
+  "staging_root": "C:\\Example\\PatreonDL",
+  "creators": [
+    {
+      "slug": "Kidney_Boy",
+      "display_name": "Kidney Boy",
+      "patreon_url": "https://www.patreon.com/kidneyboy",
+      "campaign_id": null,
+      "enabled": true,
+      "filters": {
+        "exclude_title_regex": ["(?i)chronos\\s*builder"],
+        "media_types": ["attachment", "image"]
+      }
+    },
+    {
+      "slug": "Party_of_Two",
+      "display_name": "Party of Two",
+      "patreon_url": "https://www.patreon.com/partyoftwo",
+      "campaign_id": null,
+      "enabled": true,
+      "filters": {
+        "exclude_title_regex": ["(?i)chronos\\s*builder"],
+        "media_types": ["attachment", "image"]
+      }
+    }
+  ]
+}

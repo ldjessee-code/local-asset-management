@@ -1,0 +1,35 @@
+{
+  "schema": "lam-site-profiles/v1",
+  "sites": [
+    {
+      "id": "patreon",
+      "display_name": "Patreon",
+      "login_url": "https://www.patreon.com/login",
+      "cookie_domains": [".patreon.com"],
+      "required_cookies": ["session_id"],
+      "header_cookies": "all",
+      "validate": {
+        "url": "https://www.patreon.com/api/current_user",
+        "expect_json_path": "data.id",
+        "expect_status": 200
+      },
+      "env_var": "PATREON_SESSION_COOKIE",
+      "enabled": true
+    },
+    {
+      "id": "example-wiki",
+      "display_name": "Example Wiki (fake, tests only)",
+      "login_url": "https://example.invalid/login",
+      "cookie_domains": [".example.invalid"],
+      "required_cookies": ["session"],
+      "header_cookies": ["session", "csrf"],
+      "validate": {
+        "url": "https://example.invalid/api/whoami",
+        "expect_json_path": "data.id",
+        "expect_status": 200
+      },
+      "env_var": "EXAMPLE_WIKI_COOKIE",
+      "enabled": true
+    }
+  ]
+}

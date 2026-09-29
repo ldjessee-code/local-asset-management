@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/site-profiles.v1.schema.json",
+  "title": "lam-site-profiles/v1",
+  "description": "Versioned site profiles for lam token (login URLs, cookie names, secrets paths).",
+  "type": "object",
+  "required": ["schema", "sites"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "lam-site-profiles/v1" },
+    "sites": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/site" }
+    }
+  },
+  "$defs": {
+    "site": {
+      "type": "object",
+      "required": ["id", "login_url", "cookie_domains"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_-]*$"
+        },
+        "display_name": { "type": "string", "minLength": 1 },
+        "login_url": { "type": "string", "minLength": 1 },
+        "cookie_domains": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "required_cookies": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "header_cookies": {
+          "oneOf": [
+            { "const": "all" },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          ]
+        },
+        "validate": { "$ref": "#/$defs/validate" },
+        "env_var": { "type": "string", "minLength": 1 },
+        "secrets_file": { "type": "string", "minLength": 1 },
+        "profile_dir": { "type": "string", "minLength": 1 },
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "validate": {
+      "type": "object",
+      "required": ["url"],
+      "additionalProperties": false,
+      "properties": {
+        "url": { "type": "string", "minLength": 1 },
+        "expect_json_path": { "type": "string", "minLength": 1 },
+        "expect_status": { "type": "integer", "minimum": 100 }
+      }
+    }
+  }
+}

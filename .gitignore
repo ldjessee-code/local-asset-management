@@ -19,3 +19,12 @@ Thumbs.db
 # Personal library config (any folder). Committed templates live in examples/.
 library.jsonc
 library.json
+
+# Local token-fetcher leftovers (profiles/secrets belong under %LOCALAPPDATA%\lam\)
+site-profiles.json
+*_cookie.txt
+*_meta.json
+
+# Real Patreon creator list (the committed sample stays in examples/)
+patreon-creators.json
+patreon-creators.local.json

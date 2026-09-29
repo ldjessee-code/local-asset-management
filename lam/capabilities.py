@@ -10,7 +10,17 @@ from __future__ import annotations
 from typing import Any
 
 from lam.config import DEFAULT_LAYOUTS, LAYOUT_NAMES
-from lam.schemas.registry import PLAN_SCHEMAS, RESULTS_SCHEMAS, status_groups
+from lam.schemas.registry import (
+    PATREON_CREATORS_SCHEMAS,
+    PATREON_INDEX_SCHEMAS,
+    PATREON_MANIFEST_SCHEMAS,
+    PATREON_POST_LIST_SCHEMAS,
+    PLAN_SCHEMAS,
+    RESULTS_SCHEMAS,
+    SITE_PROFILES_SCHEMA_ID,
+    SITE_PROFILES_SCHEMAS,
+    status_groups,
+)
 from lam.version import __version__
 
 SOURCE_URL = "https://github.com/ldjessee-code/local-asset-management"
@@ -77,6 +87,26 @@ COMMANDS: tuple[dict[str, Any], ...] = (
         ),
         "function": "lam.actions.run_file_actions",
     },
+    {
+        "name": "token",
+        "config_required": False,
+        "writes": True,
+        "summary": (
+            "Fetch a site session cookie from a persistent browser profile "
+            "(lam token login|get|status). Optional Playwright extra."
+        ),
+        "function": "lam.token.get_cookie_header",
+    },
+    {
+        "name": "patreon",
+        "config_required": False,
+        "writes": True,
+        "summary": (
+            "Stage Patreon posts you already pay for (list, sync, validate-config). "
+            "Dry-run default; --apply writes the inbox and manifest. Never /Gaming."
+        ),
+        "function": "lam.patreon.cli.run_patreon_command",
+    },
 )
 
 MODULES: tuple[dict[str, str], ...] = (
@@ -93,6 +123,14 @@ MODULES: tuple[dict[str, str], ...] = (
     {"module": "lam.report", "role": "Markdown + JSON summary of the index"},
     {"module": "lam.web.app", "role": "FastAPI UI and job API over the same engine"},
     {"module": "lam.cli", "role": "lam command entrypoint"},
+    {
+        "module": "lam.token",
+        "role": "Site session cookies via a persistent browser profile (lam token)",
+    },
+    {
+        "module": "lam.patreon",
+        "role": "Patreon list/sync/validate-config (staging inbox and manifest only)",
+    },
 )
 
 HTTP_API: tuple[dict[str, str], ...] = (
@@ -124,6 +162,7 @@ PUBLIC_PYTHON: tuple[str, ...] = (
     "lam.run_file_actions",
     "lam.undo_file_actions",
     "lam.describe_capabilities",
+    "lam.token.get_cookie_header",
     "lam.web.app.create_app",
 )
 
@@ -177,6 +216,31 @@ def describe_capabilities() -> dict[str, Any]:
                 "separate_from_pipeline": True,
             },
         },
+        "token": {
+            "command": "lam token",
+            "schema": SITE_PROFILES_SCHEMA_ID,
+            "schema_ids": status_groups(SITE_PROFILES_SCHEMAS),
+            "schema_registry": "lam/schemas/registry.py",
+            "docs": "docs/token-fetcher.md",
+            "optional_extra": "token",
+            "login": "lam token login <site>",
+            "get": "lam token get <site>",
+            "status": "lam token status [<site>]",
+            "library": "lam.token.get_cookie_header",
+        },
+        "patreon": {
+            "command": "lam patreon",
+            "docs": "docs/patreon-sync.md",
+            "schema_registry": "lam/schemas/registry.py",
+            "creators_schema_ids": status_groups(PATREON_CREATORS_SCHEMAS),
+            "manifest_schema_ids": status_groups(PATREON_MANIFEST_SCHEMAS),
+            "index_schema_ids": status_groups(PATREON_INDEX_SCHEMAS),
+            "post_list_schema_ids": status_groups(PATREON_POST_LIST_SCHEMAS),
+            "dry_run_default": True,
+            "list": "lam patreon list --creators CREATORS.json",
+            "sync": "lam patreon sync --creators CREATORS.json",
+            "validate": "lam patreon validate-config CREATORS.json",
+        },
         "modules": [dict(m) for m in MODULES],
         "http": [dict(h) for h in HTTP_API],
         "public_python": list(PUBLIC_PYTHON),
@@ -228,6 +292,25 @@ def format_capabilities_text(data: dict[str, Any] | None = None) -> str:
         "  results deprecated: "
         + (", ".join(result_ids["deprecated"]) if result_ids["deprecated"] else "(none)")
     )
+    token = cap["token"]
+    token_ids = token["schema_ids"]
+    lines += ["", "Site-profile schemas:"]
+    lines.append("  supported: " + ", ".join(token_ids["supported"]))
+    lines.append(
+        "  deprecated: " + (", ".join(token_ids["deprecated"]) if token_ids["deprecated"] else "(none)")
+    )
+    patreon = cap["patreon"]
+    lines += ["", "Patreon schemas:"]
+    for key in (
+        "creators_schema_ids",
+        "manifest_schema_ids",
+        "index_schema_ids",
+        "post_list_schema_ids",
+    ):
+        groups = patreon[key]
+        supported = ", ".join(groups["supported"]) or "(none)"
+        deprecated = ", ".join(groups["deprecated"]) if groups["deprecated"] else "(none)"
+        lines.append(f"  {key}: supported: {supported}; deprecated: {deprecated}")
     lines += ["", "Not in v0.1:"]
     for item in cap["safety"]["not_in_v1"]:
         lines.append(f"  - {item}")

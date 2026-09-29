@@ -28,6 +28,9 @@ Developers: [docs/architecture.md](docs/architecture.md), [AGENTS.md](AGENTS.md)
 - Layout is a named template per source, not inferred
 - Optional **`lam actions`** JSON runner (separate from the pipeline) to
   move / copy / mkdir / recycle with a dry run, `--apply`, and an undo log
+- Optional **`lam token`** to keep a site session cookie in a persistent
+  browser profile (`login` / `get` / `status`) for tools such as a Patreon
+  downloader. See [docs/token-fetcher.md](docs/token-fetcher.md).
 
 Not in v0.1: Foundry/Roll20 awareness, perceptual hash, embeddings,
 auto-tagging, clustering as folder names.
@@ -133,6 +136,32 @@ Schema files: `lam/schemas/file-action-plan.v1.schema.json` and
 Field reference, exit codes, and the versioning policy:
 [docs/file-action-plan.md](docs/file-action-plan.md).
 Schema registry: `lam/schemas/registry.py`.
+
+### Site session cookies (`lam token`)
+
+`lam token login patreon` opens a visible Chromium window on a persistent
+profile so you can log in by hand. `lam token get patreon` reads those
+cookies and writes the Cookie header to a secrets file under
+`%LOCALAPPDATA%\lam\secrets\` (never into the repo or Dropbox). Playwright
+is an optional extra: `pip install -e ".[token]"` then
+`python -m playwright install chromium`. Details, exit codes, and the
+library API: [docs/token-fetcher.md](docs/token-fetcher.md).
+
+### Patreon staging (`lam patreon`)
+
+`lam patreon list` and `lam patreon sync` stage posts the logged-in patron
+can already see. Dry-run is the default. `--apply` writes an inbox under
+the configured staging root (normally `F:\PatreonDL`) and a manifest for
+notLib. It does not unzip files and does not write into Dropbox `/Gaming`.
+Cookie setup, the four JSON formats, and exit codes:
+[docs/patreon-sync.md](docs/patreon-sync.md). The sample creators file
+points at `C:\Example` on purpose, so `--apply` cannot write.
+
+```text
+lam patreon validate-config examples\patreon-creators.sample.json
+lam patreon list --creators examples\patreon-creators.sample.json --fixture-dir tests\fixtures\patreon --last-months 12
+lam patreon sync --creators PATH\patreon-creators.json
+```
 
 Or create it from the UI with no file at all:
 

@@ -1,0 +1,14 @@
+{
+  "data": {
+    "id": "9001",
+    "type": "campaign",
+    "attributes": {
+      "vanity": "kidneyboy",
+      "name": "Kidney Boy",
+      "current_user_is_free_member": false
+    },
+    "relationships": {
+      "current_user_pledge": { "data": { "id": "pledge-kidneyboy", "type": "pledge" } }
+    }
+  }
+}

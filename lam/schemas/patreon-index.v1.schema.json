@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/patreon-index.v1.schema.json",
+  "title": "patreon-index/v1",
+  "description": "Per-creator dedupe index. Media id and sha256 map to the first staged path.",
+  "type": "object",
+  "required": ["schema", "creator_slug", "media", "sha256", "posts"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "patreon-index/v1" },
+    "creator_slug": { "type": "string" },
+    "campaign_id": { "type": ["string", "null"] },
+    "updated": { "type": "string" },
+    "media": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/media" }
+    },
+    "sha256": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/hash" }
+    },
+    "posts": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/post" }
+    }
+  },
+  "$defs": {
+    "media": {
+      "type": "object",
+      "required": ["sha256", "staging_path", "name", "size"],
+      "additionalProperties": false,
+      "properties": {
+        "sha256": { "type": "string" },
+        "staging_path": { "type": "string" },
+        "name": { "type": "string" },
+        "size": { "type": "integer" }
+      }
+    },
+    "hash": {
+      "type": "object",
+      "required": ["staging_path", "media_id"],
+      "additionalProperties": false,
+      "properties": {
+        "staging_path": { "type": "string" },
+        "media_id": { "type": "string" }
+      }
+    },
+    "post": {
+      "type": "object",
+      "required": ["status", "title", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string" },
+        "title": { "type": "string" },
+        "url": { "type": "string" }
+      }
+    }
+  }
+}

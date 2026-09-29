@@ -1,0 +1,14 @@
+{
+  "data": {
+    "id": "9002",
+    "type": "campaign",
+    "attributes": {
+      "vanity": "partyoftwo",
+      "name": "Party of Two",
+      "current_user_is_free_member": false
+    },
+    "relationships": {
+      "current_user_pledge": { "data": { "id": "pledge-partyoftwo", "type": "pledge" } }
+    }
+  }
+}

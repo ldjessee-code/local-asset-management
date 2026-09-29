@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/patreon-drop-manifest.v1.schema.json",
+  "title": "patreon-drop-manifest/v1",
+  "description": "One staging drop for a Patreon creator. notLib reads this after a ping.",
+  "type": "object",
+  "required": ["schema", "creator_slug", "run_started", "run_finished", "mode", "staging_path", "warnings", "ready_summary", "posts"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "patreon-drop-manifest/v1" },
+    "creator_slug": { "type": "string" },
+    "run_started": { "type": "string" },
+    "run_finished": { "type": "string" },
+    "mode": { "enum": ["dry-run", "apply"] },
+    "staging_path": { "type": "string" },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "ready_summary": { "type": "string" },
+    "gate": { "type": ["object", "null"] },
+    "posts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/post" }
+    }
+  },
+  "$defs": {
+    "post": {
+      "type": "object",
+      "required": ["post_id", "post_title", "post_url", "published", "status", "reason", "files"],
+      "additionalProperties": false,
+      "properties": {
+        "post_id": { "type": "string" },
+        "post_title": { "type": "string" },
+        "post_url": { "type": "string" },
+        "published": { "type": ["string", "null"] },
+        "status": {
+          "enum": ["downloaded", "deferred", "failed", "skipped-duplicate", "locked", "excluded", "planned"]
+        },
+        "reason": { "type": "string" },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file" }
+        }
+      }
+    },
+    "file": {
+      "type": "object",
+      "required": ["name", "staging_path", "size", "sha256", "kind", "downloaded_at", "status", "url", "host"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "staging_path": { "type": ["string", "null"] },
+        "size": { "type": ["integer", "null"] },
+        "sha256": { "type": ["string", "null"] },
+        "kind": { "enum": ["zip", "loose-media", "other"] },
+        "downloaded_at": { "type": ["string", "null"] },
+        "status": {
+          "enum": ["downloaded", "deferred", "failed", "skipped-duplicate", "locked", "excluded", "planned"]
+        },
+        "url": { "type": ["string", "null"] },
+        "host": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

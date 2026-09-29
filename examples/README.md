@@ -15,5 +15,8 @@ paths are not committed.
 | [spreadsheets.jsonc](spreadsheets.jsonc) | Office files grouped by extension |
 | [file-action-plan.sample.json](file-action-plan.sample.json) | Sample `file-action-plan/v1`. Every path is under `C:\Example`, which the runner refuses |
 | [file-action-results.sample.json](file-action-results.sample.json) | Sample dry-run results for that plan |
+| [site-profiles.sample.json](site-profiles.sample.json) | Sample `lam-site-profiles/v1` (`patreon` plus a fake `example-wiki`) |
+| [patreon-creators.sample.json](patreon-creators.sample.json) | Sample `patreon-creators/v1`. `staging_root` is under `C:\Example`, which `lam patreon sync` refuses |
+| [patreon-drop-manifest.sample.json](patreon-drop-manifest.sample.json) | Sample `patreon-drop-manifest/v1` with fake posts (not a real drop) |
 
 Or skip the copy: `lam serve` and fill in sources + output in the UI.

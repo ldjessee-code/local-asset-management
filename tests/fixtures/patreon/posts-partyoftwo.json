@@ -1,0 +1,34 @@
+{
+  "pages": [
+    {
+      "data": [
+        {
+          "id": "pot-830",
+          "type": "post",
+          "attributes": {
+            "title": "August Rewards",
+            "url": "https://example.invalid/posts/pot-830",
+            "published_at": "2026-08-30T15:00:00+00:00",
+            "current_user_can_view": false,
+            "content": "<p>Reward link <a href=\"https://www.dropbox.com/s/fake/pack.zip\">pack</a></p>"
+          },
+          "relationships": { "attachments": { "data": [] }, "images": { "data": [] } }
+        },
+        {
+          "id": "pot-501",
+          "type": "post",
+          "attributes": {
+            "title": "May Pack",
+            "url": "https://example.invalid/posts/pot-501",
+            "published_at": "2026-05-01T15:00:00+00:00",
+            "current_user_can_view": false,
+            "content": ""
+          },
+          "relationships": { "attachments": { "data": [] }, "images": { "data": [] } }
+        }
+      ],
+      "included": [],
+      "links": {}
+    }
+  ]
+}
