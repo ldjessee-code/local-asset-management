@@ -165,3 +165,7 @@ on a command line.
 
 Default file: `library.jsonc` in cwd. Must not sit inside a source or the
 destination tree (`lam.config.validate_config`). Setup UI can write it.
+
+## Court queue
+
+Court file chores go through gpu-queue as work type `lam`. The court calls this repo's existing CLI (`python -m lam`) with an allowlisted argv: `capabilities`, `scan`, `report`, `plan`, `apply`, `tag scan`, and `tag plan`. This repo's code is unchanged. The queue does not call `lam patreon`, `lam token`, `lam serve`, `lam actions`, or `lam undo`, and it does not pass a delete.
