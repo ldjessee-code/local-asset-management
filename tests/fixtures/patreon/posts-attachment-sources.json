@@ -1,0 +1,244 @@
+{
+  "data": [
+    {
+      "id": "163923452",
+      "type": "post",
+      "attributes": {
+        "title": "Car Ferry Legend Rewards.zip",
+        "url": "https://www.patreon.com/kidneyboy/posts/car-ferry-legend-163923452",
+        "published_at": "2026-09-18T15:00:00+00:00",
+        "current_user_can_view": true,
+        "is_paid": true,
+        "is_public": false,
+        "min_cents_pledged_to_view": 500,
+        "content": ""
+      },
+      "relationships": {
+        "attachments_media": {
+          "data": [{ "id": "med-ferry", "type": "media" }]
+        },
+        "images": { "data": [] }
+      }
+    },
+    {
+      "id": "map-88",
+      "type": "post",
+      "attributes": {
+        "title": "Map #88: Car Ferry",
+        "url": "https://example.invalid/posts/map-88",
+        "published_at": "2026-09-18T14:00:00+00:00",
+        "current_user_can_view": true,
+        "is_paid": true,
+        "is_public": false,
+        "content": ""
+      },
+      "relationships": {
+        "images": {
+          "data": [{ "id": "img-map-88", "type": "media" }]
+        }
+      }
+    },
+    {
+      "id": "legacy-1",
+      "type": "post",
+      "attributes": {
+        "title": "Harbor Legacy.zip",
+        "url": "https://example.invalid/posts/legacy-1",
+        "published_at": "2026-09-18T13:00:00+00:00",
+        "current_user_can_view": true,
+        "content": ""
+      },
+      "relationships": {
+        "attachments": {
+          "data": [{ "id": "att-legacy", "type": "attachment" }]
+        }
+      }
+    },
+    {
+      "id": "only-post-file",
+      "type": "post",
+      "attributes": {
+        "title": "Only Post File.zip",
+        "url": "https://example.invalid/posts/only-post-file",
+        "published_at": "2026-09-18T12:00:00+00:00",
+        "current_user_can_view": true,
+        "post_file": {
+          "name": "Only Post File.zip",
+          "url": "https://c10.patreonusercontent.com/fake/only-post-file.zip"
+        },
+        "content": ""
+      },
+      "relationships": {}
+    },
+    {
+      "id": "bungalow-dup",
+      "type": "post",
+      "attributes": {
+        "title": "Bungalow Legend Rewards.zip",
+        "url": "https://example.invalid/posts/bungalow-dup",
+        "published_at": "2026-08-21T15:00:00+00:00",
+        "current_user_can_view": true,
+        "is_paid": true,
+        "post_file": {
+          "name": "Bungalow Legend Rewards.zip",
+          "url": "https://c10.patreonusercontent.com/fake/bungalow-legend.zip"
+        },
+        "content": "<a href=\"https://c10.patreonusercontent.com/fake/bungalow-legend.zip\">same</a>"
+      },
+      "relationships": {
+        "attachments": {
+          "data": [{ "id": "att-bungalow", "type": "attachment" }]
+        },
+        "attachments_media": {
+          "data": [{ "id": "med-bungalow", "type": "media" }]
+        }
+      }
+    },
+    {
+      "id": "image-post-file",
+      "type": "post",
+      "attributes": {
+        "title": "Map preview only",
+        "url": "https://example.invalid/posts/image-post-file",
+        "published_at": "2026-08-21T14:00:00+00:00",
+        "current_user_can_view": true,
+        "post_file": {
+          "name": "map-preview.png",
+          "url": "https://c10.patreonusercontent.com/fake/map-preview.png"
+        },
+        "content": ""
+      },
+      "relationships": {}
+    },
+    {
+      "id": "content-1",
+      "type": "post",
+      "attributes": {
+        "title": "Content pack",
+        "url": "https://example.invalid/posts/content-1",
+        "published_at": "2026-08-20T15:00:00+00:00",
+        "current_user_can_view": true,
+        "content": "<p><a href=\"https://c10.patreonusercontent.com/fake/content-pack.zip\">zip</a> <a href=\"https://c10.patreonusercontent.com/fake/content-pack.zip\">again</a> <a href=\"https://www.dropbox.com/s/fake/notes.zip\">notes</a></p>"
+      },
+      "relationships": {}
+    },
+    {
+      "id": "locked-surv",
+      "type": "post",
+      "attributes": {
+        "title": "Car Ferry Survivor Rewards.zip",
+        "url": "https://example.invalid/posts/locked-surv",
+        "published_at": "2026-09-17T15:00:00+00:00",
+        "current_user_can_view": false,
+        "is_paid": true,
+        "is_public": false,
+        "content": "<a href=\"https://c10.patreonusercontent.com/fake/car-ferry-survivor.zip\">nope</a>"
+      },
+      "relationships": {
+        "attachments": {
+          "data": [{ "id": "att-locked", "type": "attachment" }]
+        },
+        "attachments_media": {
+          "data": [{ "id": "med-locked", "type": "media" }]
+        }
+      }
+    },
+    {
+      "id": "audio-1",
+      "type": "post",
+      "attributes": {
+        "title": "Session audio",
+        "url": "https://example.invalid/posts/audio-1",
+        "published_at": "2026-07-01T15:00:00+00:00",
+        "current_user_can_view": true,
+        "content": ""
+      },
+      "relationships": {
+        "audio": {
+          "data": [{ "id": "aud-1", "type": "media" }]
+        }
+      }
+    }
+  ],
+  "included": [
+    {
+      "id": "med-ferry",
+      "type": "media",
+      "attributes": {
+        "file_name": "Car Ferry Legend Rewards.zip",
+        "download_url": "https://c10.patreonusercontent.com/fake/car-ferry-legend.zip",
+        "mimetype": "application/zip",
+        "size_bytes": 4096
+      }
+    },
+    {
+      "id": "img-map-88",
+      "type": "media",
+      "attributes": {
+        "file_name": "map-88.png",
+        "download_url": "https://c10.patreonusercontent.com/fake/map-88.png",
+        "mimetype": "image/png",
+        "size_bytes": 2048
+      }
+    },
+    {
+      "id": "att-legacy",
+      "type": "attachment",
+      "attributes": {
+        "name": "Harbor Legacy.zip",
+        "url": "https://c10.patreonusercontent.com/fake/harbor-legacy.zip",
+        "size": 100
+      }
+    },
+    {
+      "id": "att-bungalow",
+      "type": "attachment",
+      "attributes": {
+        "name": "Bungalow Legend Rewards.zip",
+        "url": "https://c10.patreonusercontent.com/fake/bungalow-legend.zip",
+        "size": 8192
+      }
+    },
+    {
+      "id": "med-bungalow",
+      "type": "media",
+      "attributes": {
+        "file_name": "Bungalow Legend Rewards.zip",
+        "download_url": "https://c10.patreonusercontent.com/fake/bungalow-legend.zip",
+        "mimetype": "application/zip",
+        "size_bytes": 8192
+      }
+    },
+    {
+      "id": "att-locked",
+      "type": "attachment",
+      "attributes": {
+        "name": "Car Ferry Survivor Rewards.zip",
+        "url": "https://c10.patreonusercontent.com/fake/car-ferry-survivor.zip",
+        "size": 100
+      }
+    },
+    {
+      "id": "med-locked",
+      "type": "media",
+      "attributes": {
+        "file_name": "Car Ferry Survivor Rewards.zip",
+        "download_url": "https://c10.patreonusercontent.com/fake/car-ferry-survivor.zip",
+        "mimetype": "application/zip",
+        "size_bytes": 100
+      }
+    },
+    {
+      "id": "aud-1",
+      "type": "media",
+      "attributes": {
+        "file_name": "session.mp3",
+        "download_url": "https://c10.patreonusercontent.com/fake/session.mp3",
+        "mimetype": "audio/mpeg",
+        "size_bytes": 512
+      }
+    }
+  ],
+  "links": {},
+  "meta": {}
+}

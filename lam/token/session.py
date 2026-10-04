@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,16 @@ from lam.token.secret import Secret
 from lam.token.store import read_meta_file, secrets_mtime_iso, set_user_env_var, write_meta_file, write_secrets_file
 
 log = logging.getLogger("lam.token")
+
+CLOSED_WINDOW_MSG = (
+    'login window closed - session saved in profile; run "lam token status patreon --check" to confirm'
+)
+
+
+def _is_target_closed(exc: BaseException) -> bool:
+    if type(exc).__name__ == "TargetClosedError":
+        return True
+    return "target page, context or browser has been closed" in str(exc).lower()
 
 
 def load_active_profiles(path: Path | str | None = None) -> SiteProfiles:
@@ -108,6 +119,8 @@ def login(site: str, *, profiles: SiteProfiles | None = None, wait_fn=None) -> N
     check_allowed_path(profile_dir, kind="profile")
     ensure_browser_available()
     profile_dir.mkdir(parents=True, exist_ok=True)
+    cookies = None
+    closed_early = False
     with persistent_context(profile_dir, headless=False) as ctx:
         pages = getattr(ctx, "pages", None) or []
         page = pages[0] if pages else ctx.new_page()
@@ -115,12 +128,40 @@ def login(site: str, *, profiles: SiteProfiles | None = None, wait_fn=None) -> N
         waiter = wait_fn or wait_for_login
         waiter(ctx)
         try:
-            cookies = ctx.cookies()
-            selection = build_cookie_header(list(cookies), site_profile)
-            _write_meta(site_profile, _selection_meta(site_profile, selection))
-            log.debug("login saved cookie metadata for %s count=%s", site_profile.id, selection.count)
-        except TokenAuthError:
-            log.debug("login finished without required cookies for %s", site_profile.id)
+            cookies = list(ctx.cookies())
+        except TokenError:
+            raise
+        except Exception as exc:
+            if _is_target_closed(exc):
+                closed_early = True
+            else:
+                raise TokenError(gate("error", "failed to read cookies from the browser profile")) from None
+    if cookies is None and closed_early:
+        try:
+            with persistent_context(profile_dir, headless=True) as ctx:
+                cookies = list(ctx.cookies())
+        except TokenError:
+            raise
+        except Exception as exc:
+            if not _is_target_closed(exc):
+                raise TokenError(gate("error", "failed to read cookies from the browser profile")) from None
+            cookies = None
+    if cookies is None:
+        if closed_early:
+            raise TokenAuthError(
+                gate("auth", f"no saved login for {site_profile.id} - run: lam token login {site_profile.id}")
+            )
+        return
+    try:
+        selection = build_cookie_header(list(cookies), site_profile)
+        _write_meta(site_profile, _selection_meta(site_profile, selection))
+        if closed_early:
+            print(CLOSED_WINDOW_MSG, file=sys.stderr)
+        log.debug("login saved cookie metadata for %s count=%s", site_profile.id, selection.count)
+    except TokenAuthError:
+        if closed_early:
+            raise
+        log.debug("login finished without required cookies for %s", site_profile.id)
 
 
 def fetch_cookies(

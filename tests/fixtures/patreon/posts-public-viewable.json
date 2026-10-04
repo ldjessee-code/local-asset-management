@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": "public-1",
+      "type": "post",
+      "attributes": {
+        "title": "Public note",
+        "url": "https://example.invalid/posts/public-1",
+        "published_at": "2026-06-01T15:00:00+00:00",
+        "current_user_can_view": true,
+        "is_public": true,
+        "is_paid": false,
+        "content": ""
+      },
+      "relationships": {}
+    }
+  ],
+  "included": [],
+  "links": {},
+  "meta": {}
+}

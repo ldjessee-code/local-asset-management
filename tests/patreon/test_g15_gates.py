@@ -53,7 +53,6 @@ def _install(monkeypatch, handler):
         (401, "nope", 3, GATE_AUTH),
         (403, "nope", 3, GATE_AUTH),
         (403, "<html>Just a moment cf-challenge</html>", 4, GATE_CHALLENGE),
-        (200, "<html>Enter the verification code</html>", 5, GATE_VERIFICATION),
         (429, "slow down", 6, GATE_RATE),
     ],
 )
@@ -72,6 +71,23 @@ def test_whoami_gates(tmp_path: Path, monkeypatch, capsys, status, body, code, l
     doc = json.loads(results.read_text(encoding="utf-8"))
     assert doc["gate"]["exit_code"] == code
     assert line in doc["gate"]["line"]
+
+
+def test_whoami_redirect_to_login_is_verification(tmp_path: Path, monkeypatch, capsys):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(302, headers={"Location": "https://www.patreon.com/login"})
+
+    _install(monkeypatch, handler)
+    results = tmp_path / "out.json"
+    got = invoke(
+        ["patreon", "sync", "--creators", str(_cfg(tmp_path)), "--since", "2025-01-01", "--results", str(results)]
+    )
+    captured = capsys.readouterr()
+    assert got == 5
+    assert gate_lines(captured.err) == [GATE_VERIFICATION]
+    doc = json.loads(results.read_text(encoding="utf-8"))
+    assert doc["gate"]["exit_code"] == 5
+    assert GATE_VERIFICATION in doc["gate"]["line"]
 
 
 def test_network_gate(tmp_path: Path, monkeypatch, capsys):

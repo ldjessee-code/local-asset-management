@@ -1,0 +1,55 @@
+{
+  "data": [
+    {
+      "id": "147126125",
+      "type": "post",
+      "attributes": {
+        "title": "Infinite Tower 7-9 : $1 Rewards Post ",
+        "url": "https://www.patreon.com/partyoftwo/posts/infinite-tower-7-147126125",
+        "published_at": "2026-01-01T03:09:44.000+00:00",
+        "current_user_can_view": false,
+        "content": null,
+        "post_file": null,
+        "post_type": "text_only",
+        "attachments_preview_metadata": [
+          {
+            "file_name": "1_InfiniteTower_Set7.zip",
+            "mimetype": "application",
+            "size_bytes": 176691830
+          }
+        ]
+      },
+      "relationships": {
+        "audio": {
+          "data": null
+        },
+        "images": {
+          "data": []
+        },
+        "media": {
+          "data": [
+            {
+              "id": "589526183",
+              "type": "media"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "included": [
+    {
+      "id": "589526183",
+      "type": "media",
+      "attributes": {
+        "file_name": "1_InfiniteTower_Set7.zip",
+        "mimetype": "application/zip",
+        "owner_id": "147126125",
+        "owner_relationship": "attachment",
+        "size_bytes": 176691830,
+        "state": "ready"
+      }
+    }
+  ],
+  "links": {}
+}

@@ -9,6 +9,16 @@ It uses only the logged-in session. Locked posts are reported and skipped.
 Links to Dropbox, Google Drive, Mega, MediaFire, and other outside hosts
 are recorded as `deferred` and are not fetched.
 
+The posts list leaves `content` null and puts the body in
+`content_json_string` (link marks). Those hrefs are read the same way as
+HTML. A Patreon or patreonusercontent URL with a known file extension is a
+file. A `post_file` whose URL path is an image is the cover and is not
+saved under the bare name `file`. A non-image file on the `media`
+relationship is staged when it has a download URL and a known type. A
+viewable post that the list parses with no attachment, no image, and no
+outside link is fetched once from `/api/posts/<id>` with the same include
+list. The single-post `data` object is one post.
+
 ## Commands
 
 ```text
@@ -28,7 +38,10 @@ a new timestamp and does not overwrite the first file).
 `list` is read-only. It writes nothing except an optional `--results`
 file. `--fixture-dir` reads recorded JSON and does not open a socket or
 need a cookie. `--since` is inclusive (local midnight). `--until` is
-exclusive. `--last-months N` starts on the same calendar day N months
+exclusive. The posts feed is newest first. A post at or after `--until`
+is skipped and listing continues. Listing stops at the first post older
+than `--since` (or older than `published_after`, when that filter is set).
+`--last-months N` starts on the same calendar day N months
 earlier at 00:00 local, clamping short months (31 March back one month is
 28 February). The default zone is `America/Indianapolis` (override with
 `LAM_PATREON_TZ`). Tests can freeze the clock with `LAM_PATREON_NOW`.

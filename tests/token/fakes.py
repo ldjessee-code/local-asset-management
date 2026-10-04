@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -54,16 +55,24 @@ class FakeContext:
         return None
 
 
+class TargetClosedError(Exception):
+    """Stand-in for playwright._impl._errors.TargetClosedError. Tests never import Playwright."""
+
+
 class FakeBrowserLayer:
     def __init__(self, cookies: list[dict] | None = None) -> None:
         self.cookies = list(cookies or [])
         self.launches: list[dict[str, Any]] = []
         self.contexts: list[FakeContext] = []
         self.cookies_error: BaseException | None = None
+        self.cookies_error_queue: list[BaseException | None] = []
 
     def __call__(self, user_data_dir, *, headless: bool, **kwargs) -> FakeContext:
         ctx = FakeContext(Path(user_data_dir), headless, self.cookies)
-        ctx.cookies_error = self.cookies_error
+        if self.cookies_error_queue:
+            ctx.cookies_error = self.cookies_error_queue.pop(0)
+        else:
+            ctx.cookies_error = self.cookies_error
         self.launches.append(
             {"user_data_dir": Path(user_data_dir), "headless": headless, "kwargs": kwargs}
         )
@@ -72,11 +81,15 @@ class FakeBrowserLayer:
 
 
 class FakeResponse:
-    def __init__(self, status_code: int, text: str = "", json_data=None, headers=None):
+    def __init__(self, status_code: int, text: str = "", json_data=None, headers=None, url: str = ""):
         self.status_code = status_code
-        self.text = text
         self._json = json_data
-        self.headers = headers or {}
+        self.headers = dict(headers or {})
+        self.url = url
+        if json_data is not None and not text:
+            text = json.dumps(json_data)
+            self.headers.setdefault("content-type", "application/json")
+        self.text = text
 
     def json(self):
         if self._json is None:

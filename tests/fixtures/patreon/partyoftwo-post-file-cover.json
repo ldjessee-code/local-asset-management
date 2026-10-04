@@ -1,0 +1,60 @@
+{
+  "data": [
+    {
+      "id": "168120643",
+      "type": "post",
+      "attributes": {
+        "title": "Magic Worlds - Set 1",
+        "url": "https://www.patreon.com/partyoftwo/posts/magic-worlds-set-168120643",
+        "published_at": "2026-08-30T18:31:35.000+00:00",
+        "current_user_can_view": true,
+        "content": null,
+        "post_type": "image_file",
+        "post_file": {
+          "url": "https://c10.patreonusercontent.com/4/patreon-media/p/post/168120643/b671bcdd8d95431cab3ed2d6807a273d/eyJ3Ijo2MjB9/1.jpg?<query-redacted>",
+          "width": 620,
+          "height": 400,
+          "state": "ready"
+        }
+      },
+      "relationships": {
+        "attachments": {
+          "data": []
+        },
+        "attachments_media": {
+          "data": []
+        },
+        "images": {
+          "data": [
+            {
+              "id": "img-bridge",
+              "type": "media"
+            }
+          ]
+        },
+        "media": {
+          "data": [
+            {
+              "id": "img-bridge",
+              "type": "media"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "included": [
+    {
+      "id": "img-bridge",
+      "type": "media",
+      "attributes": {
+        "file_name": "Online_Bridge of the Stars_Day_Gridless.jpg",
+        "download_url": "https://c10.patreonusercontent.com/4/patreon-media/p/post/168120643/de383a5920324c73bdbd265f9b03ca25/eyJhIjoxLCJwIjoxfQ%3D%3D/1.jpg?<query-redacted>",
+        "mimetype": "image/jpeg",
+        "size_bytes": 1200,
+        "owner_relationship": "inline"
+      }
+    }
+  ],
+  "links": {}
+}

@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": "locked-only",
+      "type": "post",
+      "attributes": {
+        "title": "Hidden rewards",
+        "url": "https://example.invalid/posts/locked-only",
+        "published_at": "2026-06-01T15:00:00+00:00",
+        "current_user_can_view": false,
+        "is_paid": true,
+        "is_public": false,
+        "content": ""
+      },
+      "relationships": {}
+    }
+  ],
+  "included": [],
+  "links": {},
+  "meta": {}
+}

@@ -1,0 +1,32 @@
+{
+  "data": {
+    "id": "user-fixture",
+    "type": "user",
+    "attributes": { "full_name": "Fixture Patron" },
+    "relationships": {
+      "memberships": {
+        "data": [{ "type": "member", "id": "mem-9001" }]
+      }
+    }
+  },
+  "included": [
+    {
+      "id": "mem-9001",
+      "type": "member",
+      "attributes": {
+        "patron_status": "active_patron",
+        "currently_entitled_amount_cents": 0
+      },
+      "relationships": {
+        "campaign": { "data": { "type": "campaign", "id": "9001" } }
+      }
+    },
+    {
+      "id": "9001",
+      "type": "campaign",
+      "attributes": { "vanity": "kidneyboy", "name": "Kidney Boy" }
+    }
+  ],
+  "links": {},
+  "meta": {}
+}

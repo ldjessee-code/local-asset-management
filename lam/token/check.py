@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -15,31 +16,17 @@ from lam.token.errors import (
     TokenVerificationError,
     gate,
 )
+from lam.token.http_signals import classify_response, safe_url_for_log, snippet_for_log
 from lam.token.profiles import SiteProfile
 from lam.token.secret import Secret
+
+log = logging.getLogger("lam.token.check")
 
 ClientFactory = Callable[[], Any]
 
 _client_factory: ClientFactory | None = None
 
 MAX_ATTEMPTS = 3  # original + at most 2 retries
-_CHALLENGE_MARKERS = (
-    "cf-challenge",
-    "challenge-platform",
-    "just a moment",
-    "hcaptcha",
-    "g-recaptcha",
-    "cf-turnstile",
-    "cdn-cgi/challenge",
-)
-_TWO_FACTOR_MARKERS = (
-    "two-factor",
-    "two factor",
-    "2fa",
-    "verification code",
-    "identity verification",
-    "enter the code",
-)
 
 
 def _client():
@@ -59,23 +46,6 @@ def _json_path(data: Any, path: str) -> Any:
             return None
         cur = cur[part]
     return cur
-
-
-def _looks_like_challenge(text: str, headers: Any) -> bool:
-    blob = (text or "").lower()
-    server = ""
-    if headers:
-        server = str(headers.get("server") or headers.get("Server") or "").lower()
-    if any(marker in blob for marker in _CHALLENGE_MARKERS):
-        return True
-    if "cloudflare" in server and ("captcha" in blob or "challenge" in blob):
-        return True
-    return False
-
-
-def _looks_like_2fa(text: str) -> bool:
-    blob = (text or "").lower()
-    return any(marker in blob for marker in _TWO_FACTOR_MARKERS)
 
 
 def _is_network(exc: BaseException) -> bool:
@@ -117,10 +87,26 @@ def check_session(site: SiteProfile, header: Secret) -> dict[str, Any]:
 
 
 def _interpret(site, spec, status: int, text: str, headers, response) -> dict[str, Any]:
-    if _looks_like_challenge(text, headers):
-        raise TokenChallengeError(gate("challenge", "captcha or Cloudflare challenge"))
-    if _looks_like_2fa(text):
-        raise TokenVerificationError(gate("challenge", "2FA or verification required"))
+    url = str(getattr(response, "url", "") or "")
+    classified = classify_response(status=status, text=text, headers=headers, url=url)
+    if classified is not None:
+        kind, reason = classified
+        log.debug(
+            "token check gate %s (%s) status=%s url=%s body[:200]=%s",
+            kind,
+            reason,
+            status,
+            safe_url_for_log(url),
+            snippet_for_log(text, 200),
+        )
+        if kind == "challenge":
+            raise TokenChallengeError(gate("challenge", "captcha or Cloudflare challenge"))
+        if kind == "verification":
+            raise TokenVerificationError(gate("challenge", "2FA or verification required"))
+        if kind == "auth":
+            raise TokenAuthError(gate("auth", f"HTTP {status} for {site.id}"))
+        if kind == "rate":
+            raise TokenRateLimitError(gate("rate", "HTTP 429"))
     if status in {401, 403}:
         raise TokenAuthError(gate("auth", f"HTTP {status} for {site.id}"))
     if status == 429:

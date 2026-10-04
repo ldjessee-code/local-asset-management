@@ -1,0 +1,17 @@
+{
+  "data": {
+    "id": "4242",
+    "type": "campaign",
+    "attributes": {
+      "vanity": "stranger",
+      "name": "Stranger",
+      "current_user_is_free_member": false
+    },
+    "relationships": {
+      "current_user_pledge": { "data": null }
+    }
+  },
+  "included": [],
+  "links": {},
+  "meta": {}
+}

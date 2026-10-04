@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "id": "gated-view",
+      "type": "post",
+      "attributes": {
+        "title": "Legend drop",
+        "url": "https://example.invalid/posts/gated-view",
+        "published_at": "2026-06-01T15:00:00+00:00",
+        "current_user_can_view": true,
+        "is_paid": true,
+        "is_public": false,
+        "min_cents_pledged_to_view": 500,
+        "content": ""
+      },
+      "relationships": {
+        "access_rules": {
+          "data": [{ "type": "access-rule", "id": "rule-legend" }]
+        }
+      }
+    }
+  ],
+  "included": [],
+  "links": {},
+  "meta": {}
+}

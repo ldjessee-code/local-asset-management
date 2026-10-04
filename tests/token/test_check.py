@@ -65,15 +65,61 @@ def test_check_401_and_403(saved_login, monkeypatch):
     assert _run_check(monkeypatch, client) == EXIT_AUTH
 
 
+def test_check_2xx_json_with_2fa_words_ok(saved_login, monkeypatch):
+    payload = {
+        "data": {
+            "id": "user-1",
+            "attributes": {
+                "full_name": "Pat",
+                "two_factor_enabled": True,
+                "notes": "verification code captcha 2fa two_factor",
+            },
+        }
+    }
+    client = FakeHttpxClient([FakeResponse(200, json_data=payload)])
+    assert _run_check(monkeypatch, client) == EXIT_OK
+
+
 def test_check_cloudflare_exit_4(saved_login, monkeypatch):
     html = "<html><body>Just a moment... cf-challenge</body></html>"
-    client = FakeHttpxClient([FakeResponse(200, text=html)])
+    client = FakeHttpxClient(
+        [FakeResponse(403, text=html, headers={"content-type": "text/html"})]
+    )
     assert _run_check(monkeypatch, client) == EXIT_CHALLENGE
 
 
-def test_check_2fa_exit_5(saved_login, monkeypatch):
+def test_check_cf_mitigated_header_exit_4(saved_login, monkeypatch):
+    client = FakeHttpxClient(
+        [
+            FakeResponse(
+                403,
+                text="<html>blocked</html>",
+                headers={"content-type": "text/html", "cf-mitigated": "challenge"},
+            )
+        ]
+    )
+    assert _run_check(monkeypatch, client) == EXIT_CHALLENGE
+
+
+def test_check_2fa_redirect_exit_5(saved_login, monkeypatch):
+    client = FakeHttpxClient(
+        [FakeResponse(302, headers={"Location": "https://www.patreon.com/login"})]
+    )
+    assert _run_check(monkeypatch, client) == EXIT_VERIFICATION
+
+
+def test_check_2fa_html_at_login_url_exit_5(saved_login, monkeypatch):
     html = "<html>Enter your two-factor verification code</html>"
-    client = FakeHttpxClient([FakeResponse(200, text=html)])
+    client = FakeHttpxClient(
+        [
+            FakeResponse(
+                200,
+                text=html,
+                headers={"content-type": "text/html"},
+                url="https://www.patreon.com/login",
+            )
+        ]
+    )
     assert _run_check(monkeypatch, client) == EXIT_VERIFICATION
 
 

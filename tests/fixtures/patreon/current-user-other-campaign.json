@@ -1,0 +1,27 @@
+{
+  "data": {
+    "id": "user-fixture",
+    "type": "user",
+    "attributes": { "full_name": "Fixture Patron" },
+    "relationships": {
+      "memberships": {
+        "data": [{ "type": "member", "id": "mem-7777" }]
+      }
+    }
+  },
+  "included": [
+    {
+      "id": "mem-7777",
+      "type": "member",
+      "attributes": {
+        "patron_status": "active_patron",
+        "currently_entitled_amount_cents": 500
+      },
+      "relationships": {
+        "campaign": { "data": { "type": "campaign", "id": "7777" } }
+      }
+    }
+  ],
+  "links": {},
+  "meta": {}
+}

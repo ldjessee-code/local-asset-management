@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "id": "notes-1",
+      "type": "post",
+      "attributes": {
+        "title": "Field Notes",
+        "url": "https://example.invalid/posts/notes-1",
+        "published_at": "2026-06-01T15:00:00+00:00",
+        "current_user_can_view": true,
+        "content": ""
+      },
+      "relationships": {}
+    }
+  ],
+  "included": [],
+  "links": {},
+  "meta": {}
+}

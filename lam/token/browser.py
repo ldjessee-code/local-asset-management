@@ -48,7 +48,10 @@ def persistent_context(profile_dir: Path, *, headless: bool) -> Iterator[Any]:
         finally:
             closer = getattr(ctx, "close", None)
             if closer is not None:
-                closer()
+                try:
+                    closer()
+                except Exception:
+                    pass
         return
 
     sync_playwright = _require_playwright()
@@ -57,7 +60,10 @@ def persistent_context(profile_dir: Path, *, headless: bool) -> Iterator[Any]:
         try:
             yield ctx
         finally:
-            ctx.close()
+            try:
+                ctx.close()
+            except Exception:
+                pass
 
 
 def wait_for_login(context: Any) -> None:
@@ -71,7 +77,7 @@ def wait_for_login(context: Any) -> None:
         injected(context)
         return
     print(
-        "Log in in the browser window, then close it or press Enter here to save the session.",
+        "Log in in the browser window, then press Enter here to save the session (closing the window also works).",
         file=sys.stderr,
     )
     done = threading.Event()

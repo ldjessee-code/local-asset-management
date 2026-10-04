@@ -1,0 +1,72 @@
+{
+  "data": [
+    {
+      "id": "171028257",
+      "type": "post",
+      "attributes": {
+        "title": "Magic Worlds Set 4-6 : $5 Rewards ",
+        "url": "https://www.patreon.com/partyoftwo/posts/magic-worlds-set-171028257",
+        "published_at": "2026-09-30T18:35:58.000+00:00",
+        "current_user_can_view": true,
+        "content": null,
+        "post_file": null,
+        "post_type": "text_only",
+        "is_paid": false,
+        "embed": null,
+        "content_json_string": "{\"type\": \"doc\", \"content\": [{\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"Set 4 : \"}, {\"type\": \"text\", \"marks\": [{\"type\": \"link\", \"attrs\": {\"href\": \"https://www.dropbox.com/scl/fo/oq7b4f0d3injctpzq3vwa/ADH8eb5zQJ_ph5ymclI-Qy0?<query-redacted>\", \"target\": \"_blank\"}}], \"text\": \"Folder\"}]}, {\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"Set 4b : \"}, {\"type\": \"text\", \"marks\": [{\"type\": \"link\", \"attrs\": {\"href\": \"https://www.dropbox.com/scl/fo/oq7b4f0d3injctpzq3vwa/ADH8eb5zQJ_ph5ymclI-Qy0?<query-redacted>\", \"target\": \"_blank\"}}], \"text\": \"Direct download\"}]}, {\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"Set 5 : \"}, {\"type\": \"text\", \"marks\": [{\"type\": \"link\", \"attrs\": {\"href\": \"https://www.dropbox.com/scl/fo/tiq5vjzp50ovwiq5pnnsi/ACm4m2kK9n4t9w64u5jPcv0?<query-redacted>\", \"target\": \"_blank\"}}], \"text\": \"Folder\"}]}, {\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"Set 6 : \"}, {\"type\": \"text\", \"marks\": [{\"type\": \"link\", \"attrs\": {\"href\": \"https://www.dropbox.com/scl/fo/d0gdf5j3y9uos48fmrqia/ADOF5jGTL0p8nmRdSxzJ0Vs?<query-redacted>\", \"target\": \"_blank\"}}], \"text\": \"Direct download\"}]}, {\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"\"}, {\"type\": \"text\", \"marks\": [{\"type\": \"link\", \"attrs\": {\"href\": \"https://www.patreon.com/posts/30364003\", \"target\": \"_blank\"}}], \"text\": \"Masterpost of all $5 sets\"}]}]}"
+      },
+      "relationships": {
+        "attachments": {
+          "data": []
+        },
+        "attachments_media": {
+          "data": []
+        },
+        "audio": {
+          "data": null
+        },
+        "images": {
+          "data": []
+        },
+        "media": {
+          "data": []
+        }
+      }
+    },
+    {
+      "id": "45652282",
+      "type": "post",
+      "attributes": {
+        "title": "Aztec Temple Set 10-12 : $5 Reward Post",
+        "url": "https://www.patreon.com/partyoftwo/posts/aztec-temple-set-45652282",
+        "published_at": "2020-12-31T22:46:15.000+00:00",
+        "current_user_can_view": true,
+        "content": null,
+        "post_file": null,
+        "post_type": "text_only",
+        "is_paid": false,
+        "embed": null,
+        "content_json_string": "{\"type\": \"doc\", \"content\": [{\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"Set 10 : \"}, {\"type\": \"text\", \"marks\": [{\"type\": \"link\", \"attrs\": {\"href\": \"https://www.dropbox.com/sh/d9ubgf5uwksjzsy/AABRs4HSVimvMWgBSPLEMT_wa?<query-redacted>\", \"target\": \"_blank\"}}], \"text\": \"Folder\"}]}, {\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"Set 10b : \"}, {\"type\": \"text\", \"marks\": [{\"type\": \"link\", \"attrs\": {\"href\": \"https://www.dropbox.com/sh/d9ubgf5uwksjzsy/AABRs4HSVimvMWgBSPLEMT_wa?<query-redacted>\", \"target\": \"_blank\"}}], \"text\": \"Direct Download\"}]}, {\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"Set 11 : \"}, {\"type\": \"text\", \"marks\": [{\"type\": \"link\", \"attrs\": {\"href\": \"https://www.dropbox.com/sh/d34n2dx32ibjis0/AACH6Jt6bzzUDQwjk6vrOyCMa?<query-redacted>\", \"target\": \"_blank\"}}], \"text\": \"Folder\"}]}, {\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"Set 12 : \"}, {\"type\": \"text\", \"marks\": [{\"type\": \"link\", \"attrs\": {\"href\": \"https://www.dropbox.com/sh/pozrppry9lccu8r/AABfoHR9u3KckqporEZvXJyHa?<query-redacted>\", \"target\": \"_blank\"}}], \"text\": \"Direct Download\"}]}, {\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"\"}, {\"type\": \"text\", \"marks\": [{\"type\": \"link\", \"attrs\": {\"href\": \"https://www.patreon.com/posts/30364003\", \"target\": \"_blank\"}}], \"text\": \"Archive of all previous sets\"}]}]}"
+      },
+      "relationships": {
+        "attachments": {
+          "data": []
+        },
+        "attachments_media": {
+          "data": []
+        },
+        "audio": {
+          "data": null
+        },
+        "images": {
+          "data": []
+        },
+        "media": {
+          "data": []
+        }
+      }
+    }
+  ],
+  "included": [],
+  "links": {}
+}

@@ -13,6 +13,7 @@ from pathlib import Path
 from lam.patreon.config import Creator, CreatorsConfig
 from lam.patreon.dates import Window, in_window, now_local
 from lam.patreon.errors import PatreonError, PatreonItemError
+from lam.patreon.http_source import UNKNOWN, apply_post_membership_fallback
 from lam.patreon.names import sanitize_component
 from lam.patreon.parse import MediaItem, PostRecord
 from lam.schemas.registry import (
@@ -141,12 +142,25 @@ def _before_published_after(post: PostRecord, creator: Creator, zone) -> bool:
     return post.published.astimezone(zone) < start
 
 
+def _after_window_end(published: datetime | None, window: Window) -> bool:
+    """True when a newest-first post is at or after the exclusive ``--until``.
+
+    Those posts are outside the window, and older pages can still fall inside it.
+    """
+    if published is None:
+        return False
+    return published.astimezone(window.zone) >= window.end
+
+
 def collect_posts(source, creator: Creator, window: Window, max_posts: int | None):
-    """Return ``(posts, warnings)``. Stops at the first post older than the window."""
+    """Return ``(posts, warnings)``.
+
+    The posts feed is newest first. Posts at or after ``--until`` are skipped.
+    Paging stops at the first post older than the window (or older than
+    ``published_after``).
+    """
     info = source.resolve_campaign(creator.vanity, creator.campaign_id)
     warnings: list[str] = []
-    if info.not_a_member:
-        warnings.append(f"{creator.slug}: not a member")
     posts: list[PostRecord] = []
     cursor = None
     pages = 0
@@ -155,6 +169,8 @@ def collect_posts(source, creator: Creator, window: Window, max_posts: int | Non
         pages += 1
         stop = False
         for post in page.posts:
+            if _after_window_end(post.published, window):
+                continue
             state = in_window(post.published, window)
             if state is False or _before_published_after(post, creator, window.zone):
                 stop = True
@@ -162,7 +178,7 @@ def collect_posts(source, creator: Creator, window: Window, max_posts: int | Non
             if state == "missing":
                 warnings.append(f"{creator.slug}: post {post.post_id} has no published_at")
                 post.missing_published = True
-            posts.append(post)
+            posts.append(_enrich_empty(source, post))
             if max_posts is not None and len(posts) >= max_posts:
                 stop = True
                 break
@@ -175,7 +191,28 @@ def collect_posts(source, creator: Creator, window: Window, max_posts: int | Non
         cursor = page.next_link
     else:
         warnings.append(f"{creator.slug}: stopped after {MAX_PAGES} pages")
+    info = apply_post_membership_fallback(info, posts)
+    if info.not_a_member:
+        warnings.append(f"{creator.slug}: not a member")
+    elif info.membership == UNKNOWN:
+        warnings.append(f"{creator.slug}: membership unknown")
     return posts, warnings, info
+
+
+def _enrich_empty(source, post: PostRecord) -> PostRecord:
+    """Fetch post detail only when the list page has nothing to stage or record.
+
+    A viewable post that already has an attachment, an image, or an outside
+    link stays as the list parsed it. Dropbox packs are outside links and
+    are not fetched again.
+    """
+    if not post.can_view or post.attachments or post.images or post.outside_links:
+        return post
+    fetch = getattr(source, "fetch_post", None)
+    if fetch is None:
+        return post
+    detail = fetch(post.post_id)
+    return detail if detail is not None else post
 
 
 def _local_day(post: PostRecord, window: Window) -> str:
