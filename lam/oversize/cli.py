@@ -1,0 +1,109 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""``lam oversize scan`` and ``lam oversize list``."""
+
+from __future__ import annotations
+
+import json
+import sys
+
+from lam.oversize.engine import format_table, run_oversize_scan
+from lam.oversize.errors import OversizeError
+from lam.oversize.register import export_csv, load_register, resolve_register_path
+
+
+def add_oversize_parser(subparsers) -> None:
+    oversize = subparsers.add_parser(
+        "oversize",
+        help="Find oversize images, write proxies, and keep one central register",
+    )
+    commands = oversize.add_subparsers(dest="oversize_cmd", required=True)
+    scan = commands.add_parser(
+        "scan",
+        help="Dry-run by default. --record writes the register. --apply also builds proxies",
+    )
+    scan.add_argument("folder", help="Folder to walk. .git, symlinks, and junctions are skipped.")
+    scan.add_argument("--min-mb", type=float, default=100, help="Oversize when file bytes exceed this many MiB (default 100)")
+    scan.add_argument("--min-mp", type=float, default=89, help="Oversize when width*height exceeds this many megapixels (default 89)")
+    scan.add_argument("--max-dim", type=int, default=8000, help="Proxy long side in pixels (default 8000). Never upscales.")
+    scan.add_argument("--set-depth", type=int, default=1, help="Set folder is this many levels below FOLDER (default 1)")
+    scan.add_argument("--register", default=None, help="Register JSON. Default: LAM_OVERSIZE_REGISTER or %%LOCALAPPDATA%%\\lam\\oversize-register.json")
+    scan.add_argument("--record", action="store_true", help="Write the register only. No image files.")
+    scan.add_argument("--apply", action="store_true", help="Build proxies (and zips). Implies --record.")
+    scan.add_argument(
+        "--zip",
+        dest="zip_mode",
+        choices=("combined-with-parts", "combined", "all", "none"),
+        default="combined-with-parts",
+        help="Which originals to zip and recycle after a verified zip (default combined-with-parts)",
+    )
+    scan.add_argument("--proxy-suffix", default="_max8000", help="Inserted before the proxy extension (default _max8000)")
+    scan.add_argument("--quality", type=int, default=90, help="JPEG quality 1-100 (default 90)")
+    scan.add_argument("--json", action="store_true", help="Print JSON instead of a table")
+
+    listing = commands.add_parser("list", help="Print or export the register. Does not scan.")
+    listing.add_argument("--register", default=None, help="Register JSON. Same default as scan.")
+    listing.add_argument("--csv", default=None, help="Export CSV. Refuses to overwrite an existing file.")
+    listing.add_argument("--status", choices=("planned", "done", "error"), default=None, help="Keep only this status")
+    listing.add_argument("--json", action="store_true", help="Print JSON")
+
+
+def run_oversize_command(args) -> int:
+    try:
+        if args.oversize_cmd == "scan":
+            payload, code = run_oversize_scan(
+                args.folder,
+                min_mb=args.min_mb,
+                min_mp=args.min_mp,
+                max_dim=args.max_dim,
+                set_depth=args.set_depth,
+                register=args.register,
+                record=args.record,
+                apply=args.apply,
+                zip_mode=args.zip_mode,
+                proxy_suffix=args.proxy_suffix,
+                quality=args.quality,
+            )
+            if args.json:
+                print(json.dumps(payload, indent=2, ensure_ascii=False))
+            else:
+                print(format_table(payload), end="")
+            if code == 4:
+                print(f"oversize: {payload['errors']} file(s) errored", file=sys.stderr)
+            elif args.record or args.apply:
+                print(f"register: {payload['register']}", file=sys.stderr)
+            return code
+        if args.oversize_cmd == "list":
+            return _list_command(args)
+    except OversizeError as exc:
+        print(str(exc), file=sys.stderr)
+        return exc.code
+    except OSError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    print("unknown oversize command", file=sys.stderr)
+    return 2
+
+
+def _list_command(args) -> int:
+    path = resolve_register_path(args.register)
+    if not path.is_file():
+        raise OversizeError(f"register not found: {path}")
+    document = load_register(path)
+    entries = document["entries"]
+    if args.status:
+        entries = [entry for entry in entries if entry["status"] == args.status]
+    if args.csv:
+        export_csv(path=path_of(args.csv), entries=entries)
+        print(str(path_of(args.csv).resolve()), file=sys.stderr)
+    payload = {"schema": document["schema"], "entries": entries}
+    if args.json:
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    elif not args.csv:
+        print(f"entries={len(entries)} register={path.resolve()}")
+    return 0
+
+
+def path_of(value: str):
+    from pathlib import Path
+
+    return Path(value)
