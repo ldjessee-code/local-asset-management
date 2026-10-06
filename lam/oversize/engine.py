@@ -583,19 +583,22 @@ def run_oversize_scan(
     touched: set[str] = set()
     error_count = 0
     family_hints: dict[tuple[str, ...], tuple[float, dict]] = {}
+    candidate_tokens = [(other, normalize_tokens(other.path.stem)) for other in candidates]
     for item in sorted(oversize, key=lambda row: str(row.path).casefold()):
         home = root.resolve() if part_scope == "pack" else set_directory(item.path, root, set_depth)
         overview_tokens = normalize_tokens(item.path.stem)
         matched: list[tuple[Seen, str]] = []
-        for other in candidates:
+        # Cheap checks first (pixels, name tokens); Path.resolve() is slow on Windows/Dropbox
+        # and the pack holds thousands of candidates, so resolve only real name matches.
+        for other, other_tokens in candidate_tokens:
+            if other.pixels >= item.pixels:
+                continue
+            marker = extra_marker(overview_tokens, other_tokens)
+            if marker is None:
+                continue
             if other.path.resolve() == item.path.resolve():
                 continue
             if not is_inside(other.path, home):
-                continue
-            if other.pixels >= item.pixels:
-                continue
-            marker = extra_marker(overview_tokens, normalize_tokens(other.path.stem))
-            if marker is None:
                 continue
             matched.append((other, marker))
         matched.sort(key=lambda pair: str(pair[0].path).casefold())
