@@ -15,6 +15,7 @@ from __future__ import annotations
 import math
 import os
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -1398,24 +1399,37 @@ def write_recreated_part(
     if plan.target.exists():
         raise FileExistsError(str(plan.target))
     plan.target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = plan.target.with_name(f".{plan.target.name}.{uuid.uuid4().hex}.tmp")
     source = pyvips.Image.new_from_file(str(combined), access="random")
-    left = max(0, plan.x)
-    top = max(0, plan.y)
-    width = min(plan.w, source.width - left)
-    height = min(plan.h, source.height - top)
-    tile = source.crop(left, top, width, height)
-    if tile.width != plan.width or tile.height != plan.height:
-        tile = tile.resize(plan.width / tile.width, vscale=plan.height / tile.height)
-    if plan.png:
-        tile.pngsave(str(plan.target))
-    else:
-        if tile.bands == 1:
-            tile = tile.bandjoin([tile, tile])
-        elif tile.bands > 3:
-            tile = tile.extract_band(0, n=3)
-        tile.jpegsave(str(plan.target), Q=int(quality))
-    del source
-    del tile
+    try:
+        left = max(0, plan.x)
+        top = max(0, plan.y)
+        width = min(plan.w, source.width - left)
+        height = min(plan.h, source.height - top)
+        tile = source.crop(left, top, width, height)
+        if tile.width != plan.width or tile.height != plan.height:
+            tile = tile.resize(plan.width / tile.width, vscale=plan.height / tile.height)
+        if plan.png:
+            tile.pngsave(str(tmp))
+        else:
+            if tile.bands == 1:
+                tile = tile.bandjoin([tile, tile])
+            elif tile.bands > 3:
+                tile = tile.extract_band(0, n=3)
+            tile.jpegsave(str(tmp), Q=int(quality))
+        del tile
+        if plan.target.exists():
+            raise FileExistsError(str(plan.target))
+        os.replace(tmp, plan.target)
+    except Exception:
+        try:
+            if tmp.is_file():
+                tmp.unlink()
+        except OSError:
+            pass
+        raise
+    finally:
+        del source
 
 
 def write_previews(

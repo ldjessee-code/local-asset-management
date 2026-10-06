@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+import uuid
 from pathlib import Path
 
 from lam.oversize.errors import MissingPyvips
@@ -41,14 +43,39 @@ def proxy_extension(src: Path) -> str:
     return ".jpg"
 
 
+def _unlink_temp(path: Path) -> None:
+    try:
+        if path.is_file():
+            path.unlink()
+    except OSError:
+        pass
+
+
 def write_proxy(src: Path, dest: Path, *, max_dim: int, quality: int) -> tuple[int, int]:
-    """Shrink-on-load thumbnail. ``size='down'`` never upscales."""
+    """Shrink-on-load thumbnail. ``size='down'`` never upscales.
+
+    The pixels land in a sibling temp file and replace *dest* only when that
+    path is still absent.
+    """
     pyvips = require_pyvips()
     image = pyvips.Image.thumbnail(str(src), int(max_dim), height=int(max_dim), size="down")
-    if dest.suffix.lower() == ".png":
-        image.pngsave(str(dest))
-    else:
-        image.jpegsave(str(dest), Q=int(quality))
     width, height = int(image.width), int(image.height)
-    del image
+    if dest.exists():
+        del image
+        raise FileExistsError(f"refusing to replace existing proxy: {dest}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_name(f".{dest.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        if dest.suffix.lower() == ".png":
+            image.pngsave(str(tmp))
+        else:
+            image.jpegsave(str(tmp), Q=int(quality))
+        if dest.exists():
+            raise FileExistsError(f"refusing to replace existing proxy: {dest}")
+        os.replace(tmp, dest)
+    except Exception:
+        _unlink_temp(tmp)
+        raise
+    finally:
+        del image
     return width, height
