@@ -2,10 +2,13 @@
 
 Some map images are too big for a virtual tabletop page (about 100 MB on
 Roll20 Pro). `lam oversize` finds those images, classifies combined
-overviews against the separate part maps in the same set, and can write a
-smaller proxy. The original is sent to the Recycle Bin only when it is a
-combined map with a full part set, and only after a zip of that original
-has been checked.
+overviews against the separate part maps, and can write a smaller proxy.
+The default search is the whole scanned folder. A combined map is complete
+when the located parts cover it. The original is sent to the Recycle Bin
+only for a complete combined map, and only after a zip of that original
+has been checked. An incomplete set can be filled by cropping the missing
+cells from the combined original, and only when each cell's place and name
+are confident.
 
 pyvips is imported only when this command runs. The rest of lam works
 without it. Install the image extra when you want the command:
@@ -21,7 +24,12 @@ the command exits 3 and names `pip install pyvips-binary pyvips`.
 
 ```text
 lam oversize scan FOLDER [--min-mb 100] [--min-mp 89] [--max-dim 8000]
-                         [--set-depth 1] [--register PATH]
+                         [--set-depth 1] [--part-scope {pack,set}]
+                         [--min-score 0.90] [--min-margin 0.05]
+                         [--min-coverage 0.97]
+                         [--preview-dir DIR] [--preview-standins]
+                         [--plan-out PATH.csv]
+                         [--register PATH]
                          [--record] [--apply]
                          [--zip {combined-with-parts,combined,all,none}]
                          [--proxy-suffix _max8000] [--quality 90] [--json]
@@ -173,8 +181,141 @@ already recycled.
 
 `--zip none`, a `partial` set, and a map with no parts keep the original
 loose. The proxy is still written. That is the right default for a map
-Doug may still cut into submaps, and for a combined image whose parts do
-not cover the sheet (Aztec Zone2 has only F and G; Citadel has only A).
+Doug may still cut into submaps, and for a combined image whose located
+parts do not cover the sheet.
+
+## Part search and location
+
+`--part-scope pack` (the default) name-matches parts anywhere under the
+scanned folder. `--part-scope set` keeps the phase-1 rule: only the set
+folder (`--set-depth`), and it does not run pixel location. Two files
+with the same marker collapse to one. The keeper is the file with the
+most pixels, then the shortest path. The others are recorded as
+`duplicate_candidates`.
+
+Pack scope then locates each same-variant candidate inside the combined
+image (`lam/oversize/locate.py`).
+
+`r` is candidate pixels divided by combined pixels, on one axis. Parts of
+one map share one `r`. The search tries a geometric grid from 0.25 to 4
+on a greyscale thumbnail whose long side is 192 px, then multiplies the
+best step by 0.96–1.04. The other parts are tried at that scale on a
+320 px thumbnail. A part that misses the score or the margin at the
+shared scale is searched across the grid again. The stored `scale` stays
+the anchor. That part's box uses the scale that actually matched, so a
+print-resolution sibling can still sit on an HD combined map.
+
+The score is `spcor` (normalised correlation). On this libvips the peak
+is the centre of the template. pyvips 3.2 `maxpos()` returns
+`(value, x, y)`. The top-left of the part is the peak minus half the
+template. A full-resolution patch of at most 160 px then refines the
+origin. Tests require that origin within 2 px of the true crop, and `r`
+within 1%.
+
+The margin is the best score minus the best score outside a
+template-sized neighbourhood. `draw_rect` does not clear a float image,
+so that neighbourhood is replaced with zeros. Defaults, both required:
+`--min-score 0.90` and `--min-margin 0.05`. A miss is listed in
+`rejected_candidates` with `below min-score` or `below min-margin`. A
+template whose grey standard deviation is under 2 is below min-score and
+is not correlated. A name match that does not locate is not a part.
+
+Positions found for one variant can seed the other variants of the same
+family (every name token except the last). Each seeded part still has to
+pass `--min-score` at that place.
+
+Coverage is the area of the union of the located rectangles divided by
+the combined area. An edge strip that no part covers, and whose grey
+thumbnail standard deviation is under 2, is padding. `padding_px` is that
+area, and it is left out of the denominator. `parts_found` is `yes` when
+coverage is at least `--min-coverage` (default 0.97).
+
+Otherwise the located rectangles have to share one size (within 2%) and
+sit on a lattice. Column and row origins are clustered with a tolerance
+of `max(2 px, 4% of the cell)`. Overlap is allowed. A missing cell inside
+the sheet gets a marker only when exactly one reading order fits every
+located part: row-major or column-major, letters `a`–`z` or digits 1–99,
+with one offset. Two orders are not confident even when they would spell
+the same markers. The map stays `partial`, nothing is recreated, and
+`confidence` is `not confident:` plus the reason.
+
+Before a recreate, the sibling folder and an analogous per-letter folder
+are checked for an image whose name lacks the marker. One that locates
+on that cell is recorded as `misnamed_parts` and is not recreated.
+
+## Recreate a missing part
+
+`--apply` recreates only when `confidence` is `confident`, the zip mode
+is not `none`, and coverage is still under `--min-coverage`. The order
+for that map is: write the missing parts, verify them, write the 8K
+overview, zip the original, check the SHA-256, then recycle the original.
+A partial map that is not confident gets only the stand-in.
+
+The crop is taken from the full-resolution original (`access=random`)
+and resized by `1/r`, so the new file matches its siblings within 1 px.
+The file is JPEG at `--quality` (default 90) unless every sibling is
+PNG. The name is the nearest sibling in reading order, with that
+sibling's marker token replaced and the rest kept (prefix, case,
+separators, variant, suffix). The folder is the sibling's folder. When
+the siblings use one folder per letter, the command creates the matching
+folder and nothing else. An existing target is not overwritten: the map
+is flagged `not confident: target exists`, `--apply` writes nothing for
+it, and the process exits 4.
+
+After the write, the new file is located again. The score at that cell
+must be at least 0.98. A miss keeps the new file (there is no delete),
+still writes the stand-in, and does not zip the original.
+
+## Previews and the plan CSV
+
+A dry run still does not change the scanned tree and does not write the
+register unless you pass `--record`.
+
+`--preview-dir DIR` is allowed on a dry run. The directory must not be
+inside the scanned folder; that is exit 2, before the walk. For each
+combined map it writes an overview JPEG (long side at most 1600) with
+located parts outlined in green and missing cells outlined in red, plus
+a preview JPEG (long side at most 1024) of each cell that would be
+recreated. An existing preview name is kept and a `_2` suffix is used.
+Marker text is drawn when the text renderer is available. A failure to
+draw a label skips the label. `--preview-standins` also writes one
+unboxed preview for a map that is not combined. That flag is off by
+default.
+
+`--plan-out PATH.csv` is allowed on a dry run and never overwrites an
+existing file. One row per oversize file: path, size in MB, pixel size,
+whether it is combined, `parts_found`, confidence, action, recreate
+markers, recreate target paths and sizes, stand-in pixel size, estimated
+stand-in MB, a note that the stand-in size is an estimate from the pixel
+ratio, the zip path, and the expected zip MB. The zip is `ZIP_STORED`,
+so the expected size is the original size. The text table and `--json`
+use the same action strings: `stand-in only`, `overview + zip`, and
+`recreate N parts + overview + zip`.
+
+## Register fields
+
+`lam-oversize-register/v1` grew these optional fields. A phase-1
+register still loads. A new write always includes them.
+
+| Field | Meaning |
+|---|---|
+| `part_scope` | `pack` or `set` |
+| `scale` | Shared `r`, or null when location did not run |
+| `coverage_pct` | Located area as a percent of the sheet, after padding |
+| `padding_px` | Padding area in combined pixels |
+| `located_parts` | Path, marker, x, y, w, h in combined pixels, score, margin |
+| `rejected_candidates` | Path, reason, score |
+| `duplicate_candidates` | Path, marker, and the path that was kept |
+| `missing_cells` | Marker, x, y, w, h, target path, target size, preview path |
+| `recreated_parts` | Path, marker, sha256, size, source box, verify score, preview path |
+| `misnamed_parts` | An existing file that located on a missing cell |
+| `confidence` | `confident`, `not confident: <reason>`, or null when location did not run |
+| `action` | The same string the table prints |
+
+`part_paths` stays the name-match list after duplicate markers are
+collapsed. `parts_area_pct` stays the name-match pixel percent. With
+`--part-scope set`, `confidence` is null and `parts_found` is the
+phase-1 letter-run or area result.
 
 ## Exit codes
 
@@ -205,8 +346,10 @@ lettered parts prints `parts=no` and keeps its original next to the proxy.
 
 ## Safety
 
-- Dry run is the default. Image files change only with `--apply`.
+- Dry run is the default. Image files in the scanned tree change only with `--apply`.
+- `--preview-dir` and `--plan-out` may write outside that tree on a dry run. A preview directory inside the tree is refused. A plan CSV is never overwritten.
 - The original is recycled only after the zip's SHA-256 matches.
 - Recycle is the Windows Recycle Bin (recoverable), never a permanent delete.
-- Existing proxies and zips are not overwritten.
+- Existing proxies, zips, previews, and recreated parts are not overwritten.
+- A recreated part that fails the 0.98 check is left on disk. It is not deleted.
 - `.git`, symlinks, and junctions are not walked.

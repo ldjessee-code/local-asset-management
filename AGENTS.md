@@ -104,10 +104,13 @@ Sample sub-bins (placeholder names only): `examples/subbins.sample.json`.
 ### Oversize register (`lam-oversize-register/v1`)
 
 `lam oversize scan` finds images over a byte size or a megapixel count.
-Dry-run is the default. `--record` writes one register. `--apply` also
-writes proxies and, for a combined map whose part maps are a full set,
-zips the original and sends that original to the Recycle Bin only after
-the zip verifies. There is no per-image sidecar.
+Dry-run is the default. `--part-scope pack` (the default) searches the
+whole folder and locates parts in the combined image. `--record` writes
+one register. `--apply` also writes proxies and, for a complete combined
+map, can recreate a missing part, then zips the original and sends that
+original to the Recycle Bin only after the zip verifies. There is no
+per-image sidecar. New register fields are optional on
+`lam-oversize-register/v1`, so a phase-1 file still loads.
 
 - Register: `lam/schemas/lam-oversize-register.v1.schema.json` (`lam-oversize-register/v1`)
 
@@ -184,6 +187,11 @@ do not call the real Recycle Bin.
 | `lam oversize list --csv` export and refuse-to-overwrite | `tests/oversize/test_list.py` |
 | Exit 2 and exit 3 (`pip install pyvips-binary pyvips`) | `tests/oversize/test_exit.py` |
 | `lam-oversize-register/v1` in the registry, `lam capabilities`, this file, and `docs/oversize.md` | `tests/oversize/test_capabilities.py`, `tests/oversize/test_docs.py` |
+| Pack scope finds parts in other sets; set scope does not; duplicate markers collapse to one | `tests/oversize/test_locate.py` |
+| Located origin within 2 px and scale within 1%; a foreign name-match is rejected; a flat part is below min-score | `tests/oversize/test_locate.py` |
+| Complete set zips; one missing lattice cell is recreated; an ambiguous letter order recreates nothing | `tests/oversize/test_locate.py` |
+| A misnamed part is kept; dry-run previews and the plan CSV do not touch the tree; a recreate target is never overwritten | `tests/oversize/test_locate.py` |
+| New register fields are schema-valid and a phase-1 register still loads; court rows keep phase-1 results under `--part-scope set`, and pack scope name-matches Citadel A–D and Dwarven pt1–pt9 | `tests/oversize/test_locate.py`, `tests/oversize/test_court_rows.py` |
 
 ## Pipeline
 
