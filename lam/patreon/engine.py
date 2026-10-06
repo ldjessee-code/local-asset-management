@@ -16,6 +16,7 @@ from lam.patreon.errors import PatreonError, PatreonItemError
 from lam.patreon.http_source import UNKNOWN, apply_post_membership_fallback
 from lam.patreon.names import sanitize_component
 from lam.patreon.parse import MediaItem, PostRecord
+from lam.patreon.safe_download import temp_path_for
 from lam.schemas.registry import (
     PATREON_INDEX_SCHEMA_ID,
     PATREON_MANIFEST_SCHEMA_ID,
@@ -476,14 +477,16 @@ def _post_row(post: PostRecord, status: str, reason: str, files: list[dict]) -> 
 
 
 def _discard_part(part: Path, warnings: list[str]) -> None:
-    if not part.is_file():
-        return
-    try:
-        from lam.actions import recycle_path
+    """Recycle a failed staging temp and the ``.partial`` beside it."""
+    for candidate in (part, temp_path_for(part)):
+        if not candidate.is_file():
+            continue
+        try:
+            from lam.actions import recycle_path
 
-        recycle_path(part)
-    except Exception:
-        warnings.append(f"left in place: {part.name}")
+            recycle_path(candidate)
+        except Exception:
+            warnings.append(f"left in place: {candidate.name}")
 
 
 def _dest_path(directory: Path, filename: str, digest: str) -> Path:
