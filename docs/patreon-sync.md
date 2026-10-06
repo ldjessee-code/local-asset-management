@@ -13,8 +13,12 @@ The posts list leaves `content` null and puts the body in
 `content_json_string` (link marks). Those hrefs are read the same way as
 HTML. A Patreon or patreonusercontent URL with a known file extension is a
 file. A `post_file` whose URL path is an image is the cover and is not
-saved under the bare name `file`. A non-image file on the `media`
-relationship is staged when it has a download URL and a known type. A
+saved under the bare name `file`. An image on `attachments` or
+`attachments_media` is an attachment file (`source_kind` `attachment`),
+including a jpg or png map. It is not a preview. Preview images are the
+`images` relationship, inline media, and that image cover. A non-image
+file on the `media` relationship is staged when it has a download URL
+and a known type. A
 viewable post that the list parses with no attachment, no image, and no
 outside link is fetched once from `/api/posts/<id>` with the same include
 list. The single-post `data` object is one post.
