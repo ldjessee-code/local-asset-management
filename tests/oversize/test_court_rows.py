@@ -45,6 +45,7 @@ def test_court_rows_match_combined_and_parts_found(tmp_path: Path, write_image):
             written.setdefault(part, _part_size(part))
     for decoy in DECOYS:
         written.setdefault(decoy, (8, 8))
+    _add_pack_name_candidates(written)
     for rel, (width, height) in written.items():
         write_image(root / Path(rel), width, height)
 
@@ -53,6 +54,7 @@ def test_court_rows_match_combined_and_parts_found(tmp_path: Path, write_image):
         min_mb=100_000,
         min_mp=_MIN_MP,
         set_depth=1,
+        part_scope="set",
         register=tmp_path / "reg.json",
     )
     assert code == 0
@@ -65,3 +67,54 @@ def test_court_rows_match_combined_and_parts_found(tmp_path: Path, write_image):
         got = {Path(path).name for path in item["part_paths"]}
         expect = {Path(path).name for path in row.parts}
         assert got == expect, row.rel
+
+    pack, pack_code = run_oversize_scan(
+        root,
+        min_mb=100_000,
+        min_mp=_MIN_MP,
+        set_depth=1,
+        part_scope="pack",
+        locate=False,
+        register=tmp_path / "pack.json",
+    )
+    assert pack_code == 0
+    pack_by_name = {Path(item["original_path"]).name: item for item in pack["files"]}
+    for variant in ("Day_Eth Plane", "Day", "Night_Eth Plane", "Night"):
+        item = pack_by_name[f"Citadel_Combined_{variant}_Gridless.jpg"]
+        assert {Path(path).name for path in item["part_paths"]} == {
+            f"Citadel_{letter}_{variant}_Gridless.jpg" for letter in "ABCD"
+        }, variant
+    part_variant = {
+        "Inferno": "Inferno",
+        "OreVein": "Ore Vein",
+        "Snow": "Snow",
+        "Volcano": "Volcano",
+    }
+    for combined_variant, piece in part_variant.items():
+        item = pack_by_name[f"DwarvenInterior_Lvl2_PtA_{combined_variant}.jpg"]
+        names = {Path(path).name for path in item["part_paths"]}
+        assert names == {f"A2_DwarvenInterior_Lvl2_pt{number}_{piece}.jpg" for number in range(1, 10)}
+
+
+def _add_pack_name_candidates(written: dict[str, tuple[int, int]]) -> None:
+    """Whole-pack name matches from evidence_notes.md. Not inside the phase-1 set."""
+    for variant in ("Day_Eth Plane", "Day", "Night_Eth Plane", "Night"):
+        for letter, number in (("B", "02"), ("C", "03"), ("D", "04")):
+            rel = (
+                f"5_RadiantCitadel_Set{number}\\HD\\Citadel_{letter}\\Gridless\\"
+                f"Citadel_{letter}_{variant}_Gridless.jpg"
+            )
+            written.setdefault(rel, (8, 8))
+    pieces = (
+        ("Inferno", "Inferno"),
+        ("Ore Vein", "OreVein"),
+        ("Snow", "Snow"),
+        ("Volcano", "Volcano"),
+    )
+    for part_variant, _combined_variant in pieces:
+        for number in range(3, 10):
+            rel = (
+                f"5_DwarvenStronghold_Set{number + 5:02d}\\A2_Jpeg\\"
+                f"A2_DwarvenInterior_Lvl2_pt{number}_{part_variant}.jpg"
+            )
+            written.setdefault(rel, (8, 8))

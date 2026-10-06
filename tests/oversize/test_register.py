@@ -37,6 +37,18 @@ FIELDS = {
     "first_seen",
     "updated",
     "paths_seen",
+    "part_scope",
+    "scale",
+    "coverage_pct",
+    "padding_px",
+    "located_parts",
+    "rejected_candidates",
+    "duplicate_candidates",
+    "missing_cells",
+    "recreated_parts",
+    "misnamed_parts",
+    "confidence",
+    "action",
 }
 
 
@@ -47,6 +59,7 @@ def _record(root: Path, register: Path):
         min_mp=0.0002,
         register=register,
         record=True,
+        part_scope="set",
     )
 
 
@@ -76,6 +89,10 @@ def test_record_writes_one_register_with_every_field(tmp_path: Path, write_image
     assert entry["paths_seen"] == [entry["original_path"]]
     assert entry["first_seen"]
     assert entry["updated"]
+    assert entry["part_scope"] == "set"
+    assert entry["confidence"] is None
+    assert entry["action"] == "stand-in only"
+    assert entry["located_parts"] == []
 
 
 def test_record_schema_valid(tmp_path: Path, write_image):

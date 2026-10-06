@@ -22,6 +22,7 @@ def _scan_kwargs(register: Path, **extra):
         "register": register,
         "apply": True,
         "zip_mode": "none",
+        "part_scope": "set",
     }
     base.update(extra)
     return base

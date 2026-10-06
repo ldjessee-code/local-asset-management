@@ -7,7 +7,7 @@ from pathlib import Path
 
 from lam.oversize.engine import run_oversize_scan
 
-_SCAN = {"min_mb": 10_000, "min_mp": 0.0002, "set_depth": 1}
+_SCAN = {"min_mb": 10_000, "min_mp": 0.0002, "set_depth": 1, "part_scope": "set"}
 
 
 def _by_name(payload: dict) -> dict[str, dict]:
@@ -88,6 +88,7 @@ def test_set_depth_scopes_part_search(tmp_path: Path, write_image):
         min_mb=10_000,
         min_mp=0.0002,
         set_depth=2,
+        part_scope="set",
         register=tmp_path / "narrow.json",
     )
     wide_item = _by_name(wide)["Zone_Day.jpg"]
