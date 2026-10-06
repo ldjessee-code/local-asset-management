@@ -597,3 +597,145 @@ def test_register_fields_schema_and_v1_still_loads(tmp_path: Path):
     loaded = load_register(legacy_path)
     assert loaded["schema"] == "lam-oversize-register/v1"
     assert loaded["entries"][0]["sha256"] == entry["sha256"]
+
+
+def _half_sheet(tmp_path: Path, *, vertical: bool):
+    """Combined sheet split into two exact halves, with a space in the variant."""
+    if vertical:
+        width, height = 408, 508
+        parts = (
+            ("A", (0, 0, 204, 508)),
+            ("B", (204, 0, 204, 508)),
+        )
+        name = "MalatranTombComplex"
+    else:
+        width, height = 320, 400
+        parts = (
+            ("A", (0, 0, 320, 200)),
+            ("B", (0, 200, 320, 200)),
+        )
+        name = "Ridge"
+    root = tmp_path / "pack"
+    image = _texture(width, height, seed=21 if vertical else 22)
+    combined = root / name / "Jpeg" / "Gridless" / f"{name}_Night Unlit_Gridless.jpg"
+    _save(image, combined)
+    for letter, box in parts:
+        crop = image.crop(*box)
+        _save(
+            crop,
+            root / f"{name}_{letter}" / "Jpeg" / "Gridless" / f"{name}_{letter}_Night Unlit_Gridless.jpg",
+        )
+    return root, combined.name, parts
+
+
+def test_left_right_halves_locate_confident(tmp_path: Path):
+    """A full-height left/right split is one scale-1 sheet, not a missed match."""
+    root, combined_name, parts = _half_sheet(tmp_path, vertical=True)
+    payload, code = run_oversize_scan(
+        root,
+        min_mb=10_000,
+        min_mp=0.15,
+        part_scope="pack",
+        register=tmp_path / "reg.json",
+    )
+    assert code == 0
+    item = _by_name(payload)[combined_name]
+    assert item["combined"] is True
+    assert item["parts_found"] == "yes"
+    assert item["confidence"] == "confident"
+    assert item["scale"] is not None
+    assert abs(item["scale"] - 1.0) <= 0.01
+    assert item["coverage_pct"] >= 97
+    assert item["rejected_candidates"] == []
+    by_marker = {part["marker"]: part for part in item["located_parts"]}
+    assert set(by_marker) == {"a", "b"}
+    assert abs(by_marker["a"]["x"] - 0) <= 2
+    assert abs(by_marker["a"]["y"] - 0) <= 2
+    assert abs(by_marker["b"]["x"] - parts[1][1][0]) <= 2
+    assert abs(by_marker["b"]["y"] - 0) <= 2
+
+
+def test_top_bottom_halves_locate_confident(tmp_path: Path):
+    root, combined_name, parts = _half_sheet(tmp_path, vertical=False)
+    payload, code = run_oversize_scan(
+        root,
+        min_mb=10_000,
+        min_mp=0.09,
+        part_scope="pack",
+        register=tmp_path / "reg.json",
+    )
+    assert code == 0
+    item = _by_name(payload)[combined_name]
+    assert item["combined"] is True
+    assert item["parts_found"] == "yes"
+    assert item["confidence"] == "confident"
+    assert abs(item["scale"] - 1.0) <= 0.01
+    assert item["coverage_pct"] >= 97
+    by_marker = {part["marker"]: part for part in item["located_parts"]}
+    assert set(by_marker) == {"a", "b"}
+    assert abs(by_marker["a"]["x"]) <= 2
+    assert abs(by_marker["a"]["y"]) <= 2
+    assert abs(by_marker["b"]["x"]) <= 2
+    assert abs(by_marker["b"]["y"] - parts[1][1][1]) <= 2
+
+
+def test_refine_slop_accepts_one_mid_thumbnail_pixel():
+    """TombEntrance was 54px off: one pixel on the 320px search of a 17278px sheet."""
+    from lam.oversize.locate import _MID_LONG, refine_slop
+
+    assert refine_slop(640, 400) == 8
+    one_pixel = (17278 + _MID_LONG - 1) // _MID_LONG
+    slop = refine_slop(13529, 17278)
+    assert one_pixel == 54
+    assert slop >= one_pixel
+    assert slop < one_pixel + 8
+
+
+def test_two_by_two_with_flat_border_stays_confident(tmp_path: Path):
+    """A few pixels of flat padding around each quadrant must not split the lattice."""
+    root = tmp_path / "maps"
+    cell = 160
+    border = 2
+    image = _texture(cell * 2, cell * 2, seed=23)
+    _save(image, root / "HD_Combined" / "Hall_Combined_Day.png")
+    for index, letter in enumerate("ABCD"):
+        col, row = index % 2, index // 2
+        crop = image.crop(col * cell, row * cell, cell, cell).copy()
+        # A pad far from the crop mean dominates normalised correlation.
+        # black().add() is ushort here, and that pipeline saves as a black PNG.
+        level = int(round(float(crop.avg())))
+        part = crop.embed(
+            border,
+            border,
+            cell + 2 * border,
+            cell + 2 * border,
+            extend="background",
+            background=[level, level, level],
+        )
+        _save(part, root / f"Hall_{letter}" / f"Hall_{letter}_Day.png")
+    payload, code = run_oversize_scan(
+        root,
+        min_mb=10_000,
+        min_mp=0.05,
+        part_scope="pack",
+        register=tmp_path / "reg.json",
+    )
+    assert code == 0
+    item = _by_name(payload)["Hall_Combined_Day.png"]
+    assert item["confidence"] == "confident", (
+        item.get("confidence"),
+        item.get("scale"),
+        item.get("coverage_pct"),
+        item.get("located_parts"),
+        item.get("rejected_candidates"),
+    )
+    assert item["parts_found"] == "yes"
+    assert item["coverage_pct"] >= 97
+    by_marker = {part["marker"]: part for part in item["located_parts"]}
+    assert set(by_marker) == {"a", "b", "c", "d"}
+    for index, letter in enumerate("abcd"):
+        col, row = index % 2, index // 2
+        found = by_marker[letter]
+        assert abs(found["x"] - col * cell) <= 6
+        assert abs(found["y"] - row * cell) <= 6
+

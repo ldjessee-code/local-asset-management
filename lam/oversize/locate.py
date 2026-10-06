@@ -295,7 +295,8 @@ def _locate_all(
         x, y = hit.x, hit.y
         if refined is not None:
             refined_x, refined_y, refined_score = refined
-            near_guess = abs(refined_x - x) <= 8 and abs(refined_y - y) <= 8
+            slop = refine_slop(combined_w, combined_h)
+            near_guess = abs(refined_x - x) <= slop and abs(refined_y - y) <= slop
             if refined_score >= min_score and near_guess:
                 x, y = refined_x, refined_y
                 score = max(score, refined_score)
@@ -369,7 +370,7 @@ def _finish_geometry(
     result.padding_px = padding_px
     result.padding_note = padding_note
     content = max(1, combined_w * combined_h - padding_px)
-    covered = _union_area(rects)
+    covered = _union_area(_clipped_rects(rects, combined_w, combined_h))
     ratio = min(1.0, covered / content) if rects else 0.0
     result.coverage_pct = round(100.0 * ratio, 3)
     result.combined = name_combined or bool(rects)
@@ -435,7 +436,13 @@ def _finish_geometry(
         covered += cell.w * cell.h
     if misnamed_markers:
         content = max(1, combined_w * combined_h - padding_px)
-        ratio = min(1.0, _union_area([*rects, *_misnamed_rects(result.misnamed)]) / content)
+        ratio = min(
+            1.0,
+            _union_area(
+                _clipped_rects([*rects, *_misnamed_rects(result.misnamed)], combined_w, combined_h)
+            )
+            / content,
+        )
         result.coverage_pct = round(100.0 * ratio, 3)
         if ratio >= min_coverage:
             result.parts_found = "yes"
@@ -485,6 +492,17 @@ class _Hit:
     y: int
 
 
+def refine_slop(full_w: int, full_h: int) -> int:
+    """Pixels a full-resolution refine may move the thumbnail guess.
+
+    One pixel on the 320px search is ``max(side) / 320`` full pixels. The old
+    fixed gate of 8px kept that correction on a small fixture and threw it
+    away on a sheet whose long side is about 17k (one pixel there is 54px).
+    """
+    step = int(math.ceil(max(int(full_w), int(full_h)) / float(_MID_LONG)))
+    return max(8, step + 2)
+
+
 def _prefer(hit: _Hit, best: _Hit, min_margin: float) -> bool:
     """A clear peak beats a higher score whose second peak is stuck to it."""
     hit_ok = hit.margin >= min_margin
@@ -511,8 +529,13 @@ def _search_scale(
             best = hit
     if best is None:
         return None
+    # Fine steps are relative to the coarse winner. Multiplying the updated
+    # best walks off the grid (1.4142 * 0.96 * 0.98 landed on 1.33047936).
+    coarse_scale = best.scale
     for factor in _FINE_FACTORS:
-        hit = _match_at(pyvips, thumb, sx, sy, candidate, best.scale * factor, full_w, full_h)
+        hit = _match_at(
+            pyvips, thumb, sx, sy, candidate, coarse_scale * factor, full_w, full_h
+        )
         if hit is not None and _prefer(hit, best, min_margin):
             best = hit
     return best
@@ -524,6 +547,26 @@ def _match_at(pyvips, search, sx: float, sy: float, candidate: Candidate, scale:
     template = _template(pyvips, candidate, scale, sx, sy)
     if template is None:
         return None
+    # spcor needs a template strictly smaller than the search. A left/right
+    # half is the full height, so the true scale used to be rejected and the
+    # search kept a larger, low-scoring scale. Crop at most 2px, which is
+    # rounding or that full-bleed edge, and remember the inset.
+    inset_x = 0
+    inset_y = 0
+    limit_w = search.width - 1
+    limit_h = search.height - 1
+    extra_w = template.width - limit_w
+    extra_h = template.height - limit_h
+    if extra_w > 0 or extra_h > 0:
+        if extra_w > 2 or extra_h > 2:
+            return None
+        inset_x = max(0, extra_w) // 2
+        inset_y = max(0, extra_h) // 2
+        crop_w = template.width - max(0, extra_w)
+        crop_h = template.height - max(0, extra_h)
+        if crop_w < 8 or crop_h < 8:
+            return None
+        template = _mem(template.crop(inset_x, inset_y, crop_w, crop_h))
     if template.width >= search.width or template.height >= search.height:
         return None
     if template.width < 8 or template.height < 8:
@@ -540,8 +583,8 @@ def _match_at(pyvips, search, sx: float, sy: float, candidate: Candidate, scale:
     else:
         left = px
         top = py
-    full_x = int(round(left / sx)) if sx else 0
-    full_y = int(round(top / sy)) if sy else 0
+    full_x = int(round((left - inset_x) / sx)) if sx else 0
+    full_y = int(round((top - inset_y) / sy)) if sy else 0
     del surface
     del template
     return _Hit(scale=scale, score=score, margin=margin, x=full_x, y=full_y)
@@ -800,6 +843,36 @@ def score_file_at(
         return _score_box(pyvips, combined, combined_w, combined_h, candidate, scale, x, y, w, h)
     except Exception:
         return 0.0
+
+
+def _clipped_rects(rects: list[LocatedPart], width: int, height: int) -> list[LocatedPart]:
+    """Drop the part of a box that hangs off the sheet. Coverage uses this.
+
+    A one-pixel thumbnail error can place a box a few dozen pixels outside
+    the sheet. Counting that overhang made a shifted grid look fully covered.
+    """
+    clipped: list[LocatedPart] = []
+    for item in rects:
+        x1 = max(0, int(item.x))
+        y1 = max(0, int(item.y))
+        x2 = min(int(width), int(item.x) + int(item.w))
+        y2 = min(int(height), int(item.y) + int(item.h))
+        if x2 <= x1 or y2 <= y1:
+            continue
+        clipped.append(
+            LocatedPart(
+                item.path,
+                item.marker,
+                x1,
+                y1,
+                x2 - x1,
+                y2 - y1,
+                item.score,
+                item.margin,
+                item.index,
+            )
+        )
+    return clipped
 
 
 def _union_area(rects: list[LocatedPart]) -> int:
@@ -1062,10 +1135,14 @@ def _unique_order(
         if all(fit == other or fit != other for other in unique):
             if fit not in unique:
                 unique.append(fit)
-    # Two reading orders that predict the same markers are still two orders.
-    if len(fits) != 1:
-        return None
-    return fits[0]
+    if len(fits) == 1:
+        return fits[0]
+    # A full row or column: both orders spell the same markers and every cell
+    # is already filled, so there is nothing to recreate. A hole stays
+    # ambiguous even when the two orders would spell the same missing names.
+    if len(fits) > 1 and all(item == fits[0] for item in fits) and len(cells) == n_cols * n_rows:
+        return fits[0]
+    return None
 
 
 def _try_order(

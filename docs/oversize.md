@@ -205,12 +205,25 @@ shared scale is searched across the grid again. The stored `scale` stays
 the anchor. That part's box uses the scale that actually matched, so a
 print-resolution sibling can still sit on an HD combined map.
 
-The score is `spcor` (normalised correlation). On this libvips the peak
-is the centre of the template. pyvips 3.2 `maxpos()` returns
-`(value, x, y)`. The top-left of the part is the peak minus half the
-template. A full-resolution patch of at most 160 px then refines the
-origin. Tests require that origin within 2 px of the true crop, and `r`
-within 1%.
+The score is `spcor` (normalised correlation). `spcor` needs a template
+strictly smaller than the search image. A left/right half is the full
+height of the sheet, and a top/bottom half is the full width, so at the
+true scale the template used to be rejected and the search kept a larger
+scale with a low score. The command crops at most 2 px off that edge
+(rounding, or the full-bleed side) and shifts the origin back by the crop.
+A template that is larger by more than 2 px is still a miss at that scale.
+
+On this libvips the peak is the centre of the template. pyvips 3.2
+`maxpos()` returns `(value, x, y)`. The top-left of the part is the peak
+minus half the template. A full-resolution patch of at most 160 px then
+refines the origin. The refine may move the thumbnail guess by one pixel
+of the 320 px search (about `long side / 320` full pixels, plus 2), and
+never by less than 8 px. That is what pulls a 17k sheet back from a
+one-pixel thumbnail error. Tests require that origin within 2 px of the
+true crop, and `r` within 1%.
+
+Fine scale steps multiply the coarse winner. They do not multiply a scale
+that an earlier fine step already changed.
 
 The margin is the best score minus the best score outside a
 template-sized neighbourhood. `draw_rect` does not clear a float image,
@@ -238,6 +251,15 @@ located part: row-major or column-major, letters `a`–`z` or digits 1–99,
 with one offset. Two orders are not confident even when they would spell
 the same markers. The map stays `partial`, nothing is recreated, and
 `confidence` is `not confident:` plus the reason.
+
+A complete one-row or one-column sheet is confident when both reading
+orders spell the same marker for every cell and every cell is already
+filled. There is nothing to recreate. A hole stays `not confident: letter
+order is ambiguous` even when both orders would spell the same missing
+names, and nothing is recreated.
+
+Coverage counts only the part of each box that lies on the sheet. A box
+that hangs off the canvas does not add that overhang to the covered area.
 
 Before a recreate, the sibling folder and an analogous per-letter folder
 are checked for an image whose name lacks the marker. One that locates
