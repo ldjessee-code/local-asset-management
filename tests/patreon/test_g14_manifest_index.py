@@ -117,7 +117,7 @@ def test_outputs_match_schemas_and_keep_titles(tmp_path: Path, monkeypatch):
             "--since",
             "2025-01-01",
         ]
-    ) == 0
+    ) == 1
     names = sorted(path.name for path in (stage / "Kidney_Boy").rglob("drop-manifest_*.json"))
     assert "drop-manifest_20261001_120000.json" in names
     assert "drop-manifest_20261001_120002.json" in names

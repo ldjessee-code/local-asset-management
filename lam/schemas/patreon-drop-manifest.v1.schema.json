@@ -56,7 +56,8 @@
           "enum": ["downloaded", "deferred", "failed", "skipped-duplicate", "locked", "excluded", "planned"]
         },
         "url": { "type": ["string", "null"] },
-        "host": { "type": ["string", "null"] }
+        "host": { "type": ["string", "null"] },
+        "reason": { "type": "string" }
       }
     }
   }
