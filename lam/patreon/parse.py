@@ -388,7 +388,14 @@ def parse_posts_page(payload: dict) -> ParsedPage:
                 for type_name, media_id in _rel_ids(resource, rel_name):
                     item = _lookup(included_typed, included_id, type_name, media_id)
                     if item:
-                        source_kind = "attachment" if rel_name == "attachments" else rel_name
+                        # Image maps arrive on attachments_media. The relationship
+                        # name is not a preview; callers treat source_kind attachment
+                        # as the file and source_kind image as the preview.
+                        source_kind = (
+                            "attachment"
+                            if rel_name in {"attachments", "attachments_media"}
+                            else rel_name
+                        )
                         _add_file(attachments, seen_urls, _media_from_included(item, source_kind))
             post_file = _post_file_item(attrs, post_id)
             if post_file is not None:
