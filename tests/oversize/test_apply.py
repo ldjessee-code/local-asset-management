@@ -312,3 +312,129 @@ def test_apply_is_idempotent(tmp_path: Path, write_image):
     document = json.loads(register.read_text(encoding="utf-8"))
     assert len(document["entries"]) == 1
     assert second["files"] == []
+
+
+def test_sha256_error_on_second_file_keeps_the_first(tmp_path: Path, write_image, monkeypatch, capsys):
+    root = tmp_path / "maps"
+    write_image(root / "a_big.jpg", 80, 40)
+    write_image(root / "b_big.jpg", 80, 40)
+    register = tmp_path / "reg.json"
+    from lam.hashing import sha256_full as real_sha
+
+    calls = {"n": 0}
+
+    def flaky(path, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise OSError("locked")
+        return real_sha(path, *args, **kwargs)
+
+    monkeypatch.setattr("lam.oversize.engine.sha256_full", flaky)
+    payload, code = run_oversize_scan(root, **_scan_kwargs(register))
+    assert code == 4
+    assert payload["errors"] >= 1
+    document = json.loads(register.read_text(encoding="utf-8"))
+    done = [entry for entry in document["entries"] if entry["status"] == "done"]
+    errored = [entry for entry in document["entries"] if entry["status"] == "error"]
+    assert len(done) == 1
+    assert errored
+    assert errored[0]["error"].startswith("OSError:")
+    assert "locked" in errored[0]["error"]
+    finals = [line for line in capsys.readouterr().err.splitlines() if line.startswith("FINAL ")]
+    assert len(finals) == 1
+    assert "command=oversize-scan" in finals[0]
+    assert "failed=" in finals[0]
+
+
+def test_register_checkpoint_keeps_first_applied_entry(tmp_path: Path, write_image, monkeypatch):
+    root = tmp_path / "maps"
+    write_image(root / "a_big.jpg", 80, 40)
+    write_image(root / "b_big.jpg", 80, 40)
+    register = tmp_path / "reg.json"
+    from lam.oversize.register import save_register as real_save
+
+    def wrapped(path, document):
+        real_save(path, document)
+        raise RuntimeError("killed after first checkpoint")
+
+    monkeypatch.setattr("lam.oversize.engine.save_register", wrapped)
+    with pytest.raises(RuntimeError, match="killed after first checkpoint"):
+        run_oversize_scan(root, **_scan_kwargs(register))
+    document = json.loads(register.read_text(encoding="utf-8"))
+    assert any(entry["status"] == "done" for entry in document["entries"])
+
+
+def test_interrupted_zip_leaves_no_final_zip(tmp_path: Path, write_image, monkeypatch):
+    root = tmp_path / "maps"
+    original = write_image(root / "Set" / "Map_Day.jpg", 80, 40)
+    write_image(root / "Set" / "Map_A_Day.jpg", 8, 8)
+    write_image(root / "Set" / "Map_B_Day.jpg", 8, 8)
+
+    def boom(self, *args, **kwargs):
+        raise OSError("killed during zip")
+
+    monkeypatch.setattr(zipfile.ZipFile, "write", boom)
+    payload, code = run_oversize_scan(
+        root,
+        **_scan_kwargs(
+            tmp_path / "reg.json",
+            zip_mode="combined-with-parts",
+            recycle=lambda path: (_ for _ in ()).throw(AssertionError(f"recycled {path}")),
+        ),
+    )
+    assert code == 4
+    assert payload["files"][0]["status"] == "error"
+    assert original.is_file()
+    assert list(root.rglob("*.zip")) == []
+    assert list(root.rglob("*.tmp")) == []
+
+
+def test_preexisting_zip_of_different_size_is_not_overwritten(tmp_path: Path, write_image):
+    root = tmp_path / "maps"
+    original = write_image(root / "Set" / "Map_Day.jpg", 80, 40)
+    write_image(root / "Set" / "Map_A_Day.jpg", 8, 8)
+    write_image(root / "Set" / "Map_B_Day.jpg", 8, 8)
+    blocker = root / "_Originals_Zipped" / "Set" / "Map_Day.zip"
+    blocker.parent.mkdir(parents=True)
+    blocker.write_bytes(b"keep-zip-different-size")
+    from lam.oversize.engine import _write_zip
+
+    with pytest.raises(FileExistsError):
+        _write_zip(original, blocker, "ab" * 32)
+    assert blocker.read_bytes() == b"keep-zip-different-size"
+
+    recycled: list[Path] = []
+
+    def fake_recycle(path: Path) -> None:
+        recycled.append(Path(path))
+        Path.unlink(path)
+
+    payload, code = run_oversize_scan(
+        root,
+        **_scan_kwargs(tmp_path / "reg.json", zip_mode="combined-with-parts", recycle=fake_recycle),
+    )
+    assert code == 0
+    assert blocker.read_bytes() == b"keep-zip-different-size"
+    assert Path(payload["files"][0]["zip_path"]).name == "Map_Day_2.zip"
+    assert not original.exists()
+
+
+def test_interrupted_proxy_leaves_no_final_proxy(tmp_path: Path, write_image, monkeypatch):
+    root = tmp_path / "maps"
+    original = write_image(root / "wide.jpg", 80, 40)
+
+    real_replace = os.replace
+
+    def boom(src, dst):
+        if Path(dst).suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"}:
+            raise OSError("killed during proxy")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr("lam.oversize.images.os.replace", boom)
+    payload, code = run_oversize_scan(root, **_scan_kwargs(tmp_path / "reg.json"))
+    assert code == 4
+    assert payload["errors"] >= 1
+    assert original.is_file()
+    proxies = [path for path in root.rglob("*") if path.is_file() and path != original]
+    assert proxies == []
+    assert list(root.rglob("*.tmp")) == []

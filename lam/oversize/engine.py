@@ -15,6 +15,8 @@ import hashlib
 import math
 import os
 import re
+import tempfile
+import uuid
 import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -22,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 
 from lam.hashing import sha256_full
+from lam.log import finish_run, log_file_event, start_run
 from lam.oversize.classify import (
     area_percent,
     evidence_text,
@@ -332,9 +335,63 @@ def _plan_zip(
     return _allocate(preferred, keep, reserved), None
 
 
-def _write_zip(src: Path, dest: Path) -> None:
-    with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_STORED) as handle:
-        handle.write(src, arcname=src.name)
+def _unlink_temp(path: Path) -> None:
+    """Remove a temp this run created. Never call this on a file the user had."""
+    try:
+        if path.is_file():
+            path.unlink()
+    except OSError:
+        pass
+
+
+def _oversize_log_dir(reg_path: Path, scan_root: Path, *, writing: bool) -> Path:
+    """Register directory, unless a dry run would write inside the scanned folder.
+
+    This does not call ``is_inside``. That helper is counted by the part-search
+    budget, and a log-path check must not spend it.
+    """
+    parent = reg_path.parent
+    inside = False
+    if not writing:
+        try:
+            parent.resolve().relative_to(scan_root.resolve())
+            inside = True
+        except (OSError, ValueError):
+            inside = False
+    if writing or not inside:
+        return parent
+    return Path(tempfile.gettempdir()) / "lam-oversize-logs"
+
+
+def _unread_digest(path: Path) -> str:
+    """Schema-sized stand-in when the file bytes cannot be hashed.
+
+    The register requires 64 hex characters. This is not the file's SHA-256.
+    """
+    raw = str(path.resolve()).encode("utf-8", "surrogateescape")
+    return hashlib.sha256(b"lam-unreadable\0" + raw).hexdigest()
+
+
+def _write_zip(src: Path, dest: Path, expected_sha: str) -> None:
+    """Write a stored zip to a sibling temp, verify it, then publish *dest*.
+
+    A path that already exists is left untouched. A failed verify deletes the
+    temp and leaves the original in place.
+    """
+    if dest.exists():
+        raise FileExistsError(f"refusing to replace existing zip: {dest}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_name(f".{dest.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_STORED) as handle:
+            handle.write(src, arcname=src.name)
+        verify_zip(tmp, src, expected_sha)
+        if dest.exists():
+            raise FileExistsError(f"refusing to replace existing zip: {dest}")
+        os.replace(tmp, dest)
+    except Exception:
+        _unlink_temp(tmp)
+        raise
 
 
 def verify_zip(zip_path: Path, original: Path, expected_sha: str) -> None:
@@ -389,7 +446,7 @@ def _apply_one(
     gc.collect()
     zip_path.parent.mkdir(parents=True, exist_ok=True)
     if not zip_path.is_file():
-        _write_zip(item.path, zip_path)
+        _write_zip(item.path, zip_path, item.sha256)
     verify_zip(zip_path, item.path, item.sha256)
     entry["zip_path"] = str(zip_path.resolve())
     entry["zip_verified"] = True
@@ -625,12 +682,14 @@ def run_oversize_scan(
     reg_path = resolve_register_path(register)
     document = load_register(reg_path) if reg_path.exists() else empty_register()
     require_pyvips()
+    run = start_run("oversize-scan", _oversize_log_dir(reg_path, scan_root, writing=bool(record)))
     recycler = recycle if recycle is not None else _default_recycle
     known_proxies = _proxy_names(document)
     by_sha = {entry["sha256"]: entry for entry in document["entries"]}
 
     candidates: list[Seen] = []
     oversize: list[Seen] = []
+    hash_errors: list[tuple[Seen, str]] = []
     for path, stat in iter_files(root):
         if path.suffix.lower() not in IMAGE_EXTENSIONS:
             continue
@@ -645,7 +704,23 @@ def run_oversize_scan(
         seen = Seen(path=path, size=int(stat.st_size), width=width, height=height)
         candidates.append(seen)
         if _over_threshold(seen.size, seen.pixels, min_mb, min_mp):
-            seen.sha256 = sha256_full(path)
+            try:
+                seen.sha256 = sha256_full(path)
+            except OSError as exc:
+                message = f"{type(exc).__name__}: {exc}"
+                seen.sha256 = _unread_digest(path)
+                hash_errors.append((seen, message))
+                log_file_event(
+                    run,
+                    "error",
+                    "hash",
+                    path,
+                    size=seen.size,
+                    ok=False,
+                    error=exc,
+                    func="lam.oversize.engine.run_oversize_scan",
+                )
+                continue
             oversize.append(seen)
 
     now = _now()
@@ -653,7 +728,51 @@ def run_oversize_scan(
     plan_rows: list[dict] = []
     touched: set[str] = set()
     error_count = 0
+    for seen, message in hash_errors:
+        entry = _observation(
+            seen,
+            combined=False,
+            found="no",
+            evidence=message,
+            part_paths=[],
+            area=0,
+            now=now,
+        )
+        entry["status"] = "error"
+        entry["error"] = message
+        entry["action"] = "error"
+        old = by_sha.get(seen.sha256)
+        if old is not None:
+            entry["first_seen"] = old["first_seen"]
+            paths = list(old.get("paths_seen") or [])
+            if entry["original_path"] not in paths:
+                paths.append(entry["original_path"])
+            entry["paths_seen"] = paths
+        by_sha[seen.sha256] = entry
+        touched.add(seen.sha256)
+        rows.append(dict(entry))
+        error_count += 1
     family_hints: dict[tuple[str, ...], tuple[float, dict]] = {}
+    sent = {"done": False}
+
+    def _emit(failed_floor: int = 0) -> None:
+        if sent["done"]:
+            return
+        sent["done"] = True
+        ok_n = sum(1 for row in rows if row.get("status") in {"done", "planned"} and not row.get("error"))
+        failed_n = max(error_count, failed_floor)
+        skipped_n = max(0, len(rows) - ok_n - failed_n)
+        finish_run(run, ok=ok_n, skipped=skipped_n, failed=failed_n)
+
+    def _store_register() -> None:
+        kept = [item for sha, item in by_sha.items() if sha not in touched]
+        entries = [by_sha[sha] for sha in touched] + kept
+        entries.sort(key=lambda item: item["original_path"].casefold())
+        try:
+            save_register(reg_path, {"schema": document["schema"], "entries": entries})
+        except Exception:
+            _emit(1)
+            raise
     candidate_tokens = [(other, normalize_tokens(other.path.stem)) for other in candidates]
     for item in sorted(oversize, key=lambda row: str(row.path).casefold()):
         home = root.resolve() if part_scope == "pack" else set_directory(item.path, root, set_depth)
@@ -841,12 +960,23 @@ def run_oversize_scan(
                     "expected_zip_mb": expected_zip,
                 }
             )
-        if apply and not _outputs_present(entry, zip_needed):
+        checkpoint = apply and not _outputs_present(entry, zip_needed)
+        if checkpoint:
             verify_message = ""
             if confidence and "target exists" in confidence:
                 entry["status"] = "error"
                 entry["error"] = confidence
                 error_count += 1
+                log_file_event(
+                    run,
+                    "error",
+                    "proxy",
+                    item.path,
+                    size=item.size,
+                    ok=False,
+                    func="lam.oversize.engine._apply_one",
+                    error=OversizeError(confidence),
+                )
             else:
                 if will_recreate and analysis is not None:
                     try:
@@ -860,6 +990,16 @@ def run_oversize_scan(
                         entry["status"] = "error"
                         entry["error"] = f"{type(exc).__name__}: {exc}"
                         error_count += 1
+                        log_file_event(
+                            run,
+                            "error",
+                            "proxy",
+                            item.path,
+                            size=item.size,
+                            ok=False,
+                            error=exc,
+                            func="lam.oversize.engine._write_recreations",
+                        )
                 if entry.get("status") != "error":
                     try:
                         _apply_one(
@@ -877,6 +1017,16 @@ def run_oversize_scan(
                         entry["status"] = "error"
                         entry["error"] = f"{type(exc).__name__}: {exc}"
                         error_count += 1
+                        log_file_event(
+                            run,
+                            "error",
+                            "zip" if zip_needed else "proxy",
+                            item.path,
+                            size=item.size,
+                            ok=False,
+                            error=exc,
+                            func="lam.oversize.engine._apply_one",
+                        )
                     if verify_message and entry.get("status") != "error":
                         entry["status"] = "error"
                         entry["error"] = verify_message
@@ -884,12 +1034,11 @@ def run_oversize_scan(
                     elif verify_message:
                         entry["error"] = verify_message
         rows.append(dict(entry))
+        if checkpoint:
+            _store_register()
 
     if record:
-        kept = [entry for sha, entry in by_sha.items() if sha not in touched]
-        entries = list(by_sha[sha] for sha in touched) + kept
-        entries.sort(key=lambda entry: entry["original_path"].casefold())
-        save_register(reg_path, {"schema": document["schema"], "entries": entries})
+        _store_register()
     if plan_path is not None:
         plan_path.parent.mkdir(parents=True, exist_ok=True)
         with plan_path.open("w", encoding="utf-8", newline="") as handle:
@@ -907,6 +1056,7 @@ def run_oversize_scan(
         "files": rows,
     }
     code = 4 if apply and error_count else 0
+    _emit()
     return payload, code
 
 
