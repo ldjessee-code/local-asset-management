@@ -38,6 +38,18 @@ def add_oversize_parser(subparsers) -> None:
     )
     scan.add_argument("--proxy-suffix", default="_max8000", help="Inserted before the proxy extension (default _max8000)")
     scan.add_argument("--quality", type=int, default=90, help="JPEG quality 1-100 (default 90)")
+    scan.add_argument(
+        "--part-scope",
+        choices=("pack", "set"),
+        default="pack",
+        help="Where to look for part maps. pack searches the whole folder (default). set stays inside --set-depth",
+    )
+    scan.add_argument("--min-score", type=float, default=0.90, help="Minimum normalised correlation to accept a part (default 0.90)")
+    scan.add_argument("--min-margin", type=float, default=0.05, help="Minimum gap between the best and second peak (default 0.05)")
+    scan.add_argument("--min-coverage", type=float, default=0.97, help="Located area / combined area required for a complete set (default 0.97)")
+    scan.add_argument("--preview-dir", default=None, help="Write check previews here. Allowed on a dry run. Must not be inside FOLDER")
+    scan.add_argument("--preview-standins", action="store_true", help="Also write a stand-in preview for maps that are not combined")
+    scan.add_argument("--plan-out", default=None, help="Write a plan CSV. Allowed on a dry run. Refuses to overwrite")
     scan.add_argument("--json", action="store_true", help="Print JSON instead of a table")
 
     listing = commands.add_parser("list", help="Print or export the register. Does not scan.")
@@ -62,6 +74,13 @@ def run_oversize_command(args) -> int:
                 zip_mode=args.zip_mode,
                 proxy_suffix=args.proxy_suffix,
                 quality=args.quality,
+                part_scope=args.part_scope,
+                min_score=args.min_score,
+                min_margin=args.min_margin,
+                min_coverage=args.min_coverage,
+                preview_dir=args.preview_dir,
+                preview_standins=args.preview_standins,
+                plan_out=args.plan_out,
             )
             if args.json:
                 print(json.dumps(payload, indent=2, ensure_ascii=False))

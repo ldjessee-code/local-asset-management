@@ -71,7 +71,128 @@
           "type": "array",
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 }
-        }
+        },
+        "part_scope": { "enum": ["pack", "set"] },
+        "scale": { "type": ["number", "null"] },
+        "coverage_pct": { "type": ["number", "null"] },
+        "padding_px": { "type": "integer", "minimum": 0 },
+        "located_parts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/located_part" }
+        },
+        "rejected_candidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/rejected_candidate" }
+        },
+        "duplicate_candidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/duplicate_candidate" }
+        },
+        "missing_cells": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/missing_cell" }
+        },
+        "recreated_parts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/recreated_part" }
+        },
+        "misnamed_parts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/misnamed_part" }
+        },
+        "confidence": { "type": ["string", "null"] },
+        "action": { "type": "string", "minLength": 1 }
+      }
+    },
+    "located_part": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "marker", "x", "y", "w", "h", "score", "margin"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "marker": { "type": "string", "minLength": 1 },
+        "x": { "type": "integer" },
+        "y": { "type": "integer" },
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 },
+        "score": { "type": "number" },
+        "margin": { "type": "number" }
+      }
+    },
+    "rejected_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reason", "score"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "score": { "type": ["number", "null"] }
+      }
+    },
+    "duplicate_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "marker", "kept_path"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "marker": { "type": "string", "minLength": 1 },
+        "kept_path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "missing_cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["marker", "x", "y", "w", "h", "target_path", "target_width", "target_height", "preview_path"],
+      "properties": {
+        "marker": { "type": "string", "minLength": 1 },
+        "x": { "type": "integer" },
+        "y": { "type": "integer" },
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 },
+        "target_path": { "type": ["string", "null"] },
+        "target_width": { "type": ["integer", "null"] },
+        "target_height": { "type": ["integer", "null"] },
+        "preview_path": { "type": ["string", "null"] }
+      }
+    },
+    "source_box": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "w", "h"],
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" },
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "recreated_part": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "marker", "sha256", "width", "height", "source_box", "verify_score", "preview_path"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "marker": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "source_box": { "$ref": "#/$defs/source_box" },
+        "verify_score": { "type": "number" },
+        "preview_path": { "type": ["string", "null"] }
+      }
+    },
+    "misnamed_part": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "marker", "x", "y", "w", "h", "score"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "marker": { "type": "string", "minLength": 1 },
+        "x": { "type": "integer" },
+        "y": { "type": "integer" },
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 },
+        "score": { "type": "number" }
       }
     }
   }

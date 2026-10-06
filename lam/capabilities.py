@@ -129,8 +129,11 @@ COMMANDS: tuple[dict[str, Any], ...] = (
         "writes": True,
         "summary": (
             "Proxy oversize images (lam oversize scan|list). Dry-run default. "
-            "--apply writes a long-side proxy and, for a combined map with a full "
-            "part set, zips the original and recycles it after the zip verifies."
+            "--part-scope pack (default) locates parts across the scanned folder. "
+            "--apply writes a long-side proxy and, for a complete combined map, "
+            "can recreate a missing part, then zips the original and recycles it "
+            "after the zip verifies. Flags: --min-score --min-margin --min-coverage "
+            "--preview-dir --plan-out."
         ),
         "function": "lam.oversize.cli.run_oversize_command",
     },

@@ -9,8 +9,10 @@ or a zip.
 
 from __future__ import annotations
 
+import csv
 import gc
 import hashlib
+import math
 import os
 import zipfile
 from collections.abc import Callable
@@ -31,6 +33,17 @@ from lam.oversize.classify import (
     should_zip,
 )
 from lam.oversize.errors import OversizeError, ZipVerifyError
+from lam.oversize.locate import (
+    Analysis,
+    Candidate,
+    analyze_map,
+    collapse_markers,
+    family_key,
+    score_file_at,
+    standin_size,
+    write_previews,
+    write_recreated_part,
+)
 from lam.oversize.images import (
     IMAGE_EXTENSIONS,
     proxy_extension,
@@ -131,6 +144,10 @@ def _check_args(
     quality: int,
     proxy_suffix: str,
     zip_mode: str,
+    part_scope: str,
+    min_score: float,
+    min_margin: float,
+    min_coverage: float,
 ) -> None:
     if min_mb < 0 or min_mp < 0:
         raise OversizeError("thresholds must be 0 or more")
@@ -144,6 +161,14 @@ def _check_args(
         raise OversizeError("--proxy-suffix must be a non-empty name fragment")
     if zip_mode not in ZIP_MODES:
         raise OversizeError(f"--zip must be one of: {', '.join(ZIP_MODES)}")
+    if part_scope not in ("pack", "set"):
+        raise OversizeError("--part-scope must be pack or set")
+    if not 0 <= float(min_score) <= 1:
+        raise OversizeError("--min-score must be from 0 to 1")
+    if float(min_margin) < 0:
+        raise OversizeError("--min-margin must be 0 or more")
+    if not 0 <= float(min_coverage) <= 1:
+        raise OversizeError("--min-coverage must be from 0 to 1")
 
 
 def _over_threshold(size: int, pixels: int, min_mb: float, min_mp: float) -> bool:
@@ -171,7 +196,17 @@ def _blank_work() -> dict:
     }
 
 
-def _observation(item: Seen, *, combined: bool, found: str, evidence: str, part_paths: list[str], area: int, now: str) -> dict:
+def _observation(
+    item: Seen,
+    *,
+    combined: bool,
+    found: str,
+    evidence: str,
+    part_paths: list[str],
+    area: int,
+    now: str,
+    phase2: dict | None = None,
+) -> dict:
     return {
         "original_path": str(item.path.resolve()),
         "sha256": item.sha256,
@@ -191,6 +226,7 @@ def _observation(item: Seen, *, combined: bool, found: str, evidence: str, part_
         "updated": now,
         "paths_seen": [str(item.path.resolve())],
         **_blank_work(),
+        **(phase2 or {}),
     }
 
 
@@ -301,10 +337,163 @@ def _apply_one(entry: dict, item: Seen, *, max_dim: int, quality: int, proxy_suf
     entry["error"] = None
 
 
-def _action(zip_needed: bool) -> str:
+def _describe_action(*, zip_needed: bool, confidence: str | None, plan_count: int) -> str:
+    """Planned file work. A confident recreate names the missing-cell count."""
+    del confidence
+    if plan_count:
+        return f"recreate {plan_count} parts + overview + zip"
     if zip_needed:
-        return "proxy, zip original, recycle original after verify"
-    return "proxy, keep original"
+        return "overview + zip"
+    return "stand-in only"
+
+
+def _blank_phase(part_scope: str) -> dict:
+    return {
+        "part_scope": part_scope,
+        "scale": None,
+        "coverage_pct": None,
+        "padding_px": 0,
+        "located_parts": [],
+        "rejected_candidates": [],
+        "duplicate_candidates": [],
+        "missing_cells": [],
+        "recreated_parts": [],
+        "misnamed_parts": [],
+        "confidence": None,
+        "action": "stand-in only",
+    }
+
+
+def _located_row(part) -> dict:
+    return {
+        "path": part.path,
+        "marker": part.marker,
+        "x": int(part.x),
+        "y": int(part.y),
+        "w": int(part.w),
+        "h": int(part.h),
+        "score": part.score,
+        "margin": part.margin,
+    }
+
+
+def _missing_row(cell) -> dict:
+    return {
+        "marker": cell.marker,
+        "x": int(cell.x),
+        "y": int(cell.y),
+        "w": int(cell.w),
+        "h": int(cell.h),
+        "target_path": cell.target_path,
+        "target_width": cell.target_width,
+        "target_height": cell.target_height,
+        "preview_path": cell.preview_path,
+    }
+
+
+def _phase_from(analysis: Analysis | None, duplicates: list[dict], part_scope: str, action: str) -> dict:
+    phase = _blank_phase(part_scope)
+    phase["duplicate_candidates"] = duplicates
+    phase["action"] = action
+    if analysis is None:
+        return phase
+    phase["scale"] = analysis.scale
+    phase["coverage_pct"] = analysis.coverage_pct
+    phase["padding_px"] = int(analysis.padding_px or 0)
+    phase["located_parts"] = [_located_row(part) for part in analysis.located]
+    phase["rejected_candidates"] = [
+        {"path": item.path, "reason": item.reason, "score": item.score} for item in analysis.rejected
+    ]
+    phase["missing_cells"] = [_missing_row(cell) for cell in analysis.missing]
+    phase["misnamed_parts"] = [
+        {
+            "path": item.path,
+            "marker": item.marker,
+            "x": int(item.x),
+            "y": int(item.y),
+            "w": int(item.w),
+            "h": int(item.h),
+            "score": item.score,
+        }
+        for item in analysis.misnamed
+    ]
+    phase["confidence"] = analysis.confidence
+    return phase
+
+
+def _write_recreations(item: Seen, analysis: Analysis, quality: int) -> tuple[list[dict], bool, str]:
+    """Crop each planned cell. Refuse when the target file is already there.
+
+    A new file that scores under 0.98 is kept. The caller must not zip.
+    """
+    made: list[dict] = []
+    scale = analysis.scale if analysis.scale else 1.0
+    verified = True
+    message = ""
+    for plan in analysis.plans:
+        if plan.target.exists():
+            raise FileExistsError(f"target exists: {plan.target}")
+        write_recreated_part(item.path, plan, quality=quality)
+        width, height = read_dimensions(plan.target)
+        score = score_file_at(
+            item.path,
+            item.width,
+            item.height,
+            plan.target,
+            width,
+            height,
+            scale,
+            plan.x,
+            plan.y,
+            plan.w,
+            plan.h,
+        )
+        if isinstance(score, float) and (math.isnan(score) or math.isinf(score)):
+            score = 0.0
+        preview = None
+        for cell in analysis.missing:
+            if cell.marker == plan.marker:
+                preview = cell.preview_path
+                break
+        record = {
+            "path": str(plan.target.resolve()),
+            "marker": plan.marker,
+            "sha256": sha256_full(plan.target),
+            "width": int(width),
+            "height": int(height),
+            "source_box": {
+                "x": int(plan.x),
+                "y": int(plan.y),
+                "w": int(plan.w),
+                "h": int(plan.h),
+            },
+            "verify_score": round(float(score), 4),
+            "preview_path": preview,
+        }
+        made.append(record)
+        if record["verify_score"] < 0.98:
+            verified = False
+            message = f"verify score {record['verify_score']} below 0.98 for {plan.marker}"
+    gc.collect()
+    return made, verified, message
+
+
+_PLAN_FIELDS = (
+    "path",
+    "mb",
+    "wxh",
+    "combined",
+    "parts_found",
+    "confidence",
+    "action",
+    "recreate_markers",
+    "recreate_targets",
+    "standin_wxh",
+    "estimated_standin_mb",
+    "standin_mb_note",
+    "zip_target",
+    "expected_zip_mb",
+)
 
 
 def run_oversize_scan(
@@ -321,8 +510,22 @@ def run_oversize_scan(
     proxy_suffix: str = "_max8000",
     quality: int = 90,
     recycle: RecycleFn | None = None,
+    part_scope: str = "pack",
+    min_score: float = 0.90,
+    min_margin: float = 0.05,
+    min_coverage: float = 0.97,
+    preview_dir: str | Path | None = None,
+    preview_standins: bool = False,
+    plan_out: str | Path | None = None,
+    locate: bool | None = None,
 ) -> tuple[dict, int]:
-    """Walk *folder*. Write the register only when *record* or *apply* is set."""
+    """Walk *folder*. Write the register only when *record* or *apply* is set.
+
+    ``part_scope="pack"`` (the default) searches the whole folder and locates
+    parts in the combined image. ``"set"`` keeps the phase-1 search inside
+    ``--set-depth`` and does not locate. Pass ``locate=False`` to collect
+    pack name matches without reading pixels.
+    """
     _check_args(
         min_mb=min_mb,
         min_mp=min_mp,
@@ -331,10 +534,21 @@ def run_oversize_scan(
         quality=quality,
         proxy_suffix=proxy_suffix,
         zip_mode=zip_mode,
+        part_scope=part_scope,
+        min_score=min_score,
+        min_margin=min_margin,
+        min_coverage=min_coverage,
     )
+    do_locate = (part_scope == "pack") if locate is None else bool(locate)
     root = Path(folder)
     if not root.is_dir():
         raise OversizeError(f"folder not found: {root}")
+    preview_path = Path(preview_dir).expanduser() if preview_dir else None
+    plan_path = Path(plan_out).expanduser() if plan_out else None
+    if preview_path is not None and is_inside(preview_path, root):
+        raise OversizeError(f"preview dir must not be inside the scanned folder: {preview_path}")
+    if plan_path is not None and plan_path.exists():
+        raise OversizeError(f"refusing to overwrite plan: {plan_path}")
     if apply:
         record = True
     reg_path = resolve_register_path(register)
@@ -365,10 +579,12 @@ def run_oversize_scan(
 
     now = _now()
     rows: list[dict] = []
+    plan_rows: list[dict] = []
     touched: set[str] = set()
     error_count = 0
+    family_hints: dict[tuple[str, ...], tuple[float, dict]] = {}
     for item in sorted(oversize, key=lambda row: str(row.path).casefold()):
-        home = set_directory(item.path, root, set_depth)
+        home = root.resolve() if part_scope == "pack" else set_directory(item.path, root, set_depth)
         overview_tokens = normalize_tokens(item.path.stem)
         matched: list[tuple[Seen, str]] = []
         for other in candidates:
@@ -383,19 +599,80 @@ def run_oversize_scan(
                 continue
             matched.append((other, marker))
         matched.sort(key=lambda pair: str(pair[0].path).casefold())
-        markers = [marker for _other, marker in matched]
-        part_paths = [str(other.path.resolve()) for other, _marker in matched]
-        raw_area, area = area_percent(sum(other.pixels for other, _marker in matched), item.pixels)
+        duplicates: list[dict] = []
+        if part_scope == "pack":
+            pixel_of = {_norm(other.path): other.pixels for other, _marker in matched}
+            kept, duplicates = collapse_markers(
+                [
+                    (Candidate(other.path.resolve(), marker, other.width, other.height), other.pixels)
+                    for other, marker in matched
+                ]
+            )
+            markers = [cand.marker for cand in kept]
+            part_paths = [str(Path(cand.path).resolve()) for cand in kept]
+            raw_area, area = area_percent(
+                sum(pixel_of.get(_norm(cand.path), 0) for cand in kept),
+                item.pixels,
+            )
+            locate_candidates = kept
+        else:
+            markers = [marker for _other, marker in matched]
+            part_paths = [str(other.path.resolve()) for other, _marker in matched]
+            raw_area, area = area_percent(sum(other.pixels for other, _marker in matched), item.pixels)
+            locate_candidates = [
+                Candidate(other.path.resolve(), marker, other.width, other.height) for other, marker in matched
+            ]
         found = parts_found(markers, raw_area)
         name_combined = path_says_combined(item.path, root)
         combined = name_combined or bool(matched)
+        analysis: Analysis | None = None
+        if do_locate and locate_candidates:
+            family = family_key(overview_tokens)
+            hint = family_hints.get(family)
+            analysis = analyze_map(
+                item.path,
+                item.width,
+                item.height,
+                locate_candidates,
+                name_combined=name_combined,
+                min_score=min_score,
+                min_margin=min_margin,
+                min_coverage=min_coverage,
+                scale_hint=None if hint is None else hint[0],
+                position_seeds=None if hint is None else hint[1],
+                proxy_suffix=proxy_suffix,
+            )
+            found = analysis.parts_found
+            combined = bool(analysis.combined)
+            if hint is None and analysis.scale and analysis.located:
+                family_hints[family] = (float(analysis.scale), dict(analysis.seeds))
         evidence = evidence_text(
             name_combined=name_combined,
-            count=len(matched),
+            count=len(markers),
             markers=markers,
             area=area,
             status=found,
         )
+        if analysis is not None:
+            coverage = "n/a" if analysis.coverage_pct is None else analysis.coverage_pct
+            evidence += (
+                f"; scope=pack; coverage={coverage}%; padding={analysis.padding_note}; "
+                f"confidence={analysis.confidence}"
+            )
+        confidence = analysis.confidence if analysis is not None else None
+        will_recreate = (
+            analysis is not None
+            and confidence == "confident"
+            and bool(analysis.plans)
+            and zip_mode != "none"
+        )
+        plan_count = len(analysis.plans) if will_recreate and analysis is not None else 0
+        found_for_zip = "yes" if plan_count else found
+        zip_needed = should_zip(zip_mode, combined, found_for_zip)
+        if not zip_needed:
+            plan_count = 0
+            will_recreate = False
+        action = _describe_action(zip_needed=zip_needed, confidence=confidence, plan_count=plan_count)
         fresh = _observation(
             item,
             combined=combined,
@@ -404,8 +681,8 @@ def run_oversize_scan(
             part_paths=part_paths,
             area=area,
             now=now,
+            phase2=_phase_from(analysis, duplicates, part_scope, action),
         )
-        zip_needed = should_zip(zip_mode, combined, found)
         old = by_sha.get(item.sha256)
         if old is not None and item.sha256 in touched:
             paths = list(old["paths_seen"])
@@ -425,30 +702,115 @@ def run_oversize_scan(
                 entry["error"] = None
             by_sha[item.sha256] = entry
             touched.add(item.sha256)
+        if preview_path is not None and combined:
+            located = [] if analysis is None else list(analysis.located)
+            missing = [] if analysis is None else list(analysis.missing)
+            write_previews(
+                preview_dir=preview_path,
+                combined=item.path,
+                combined_w=item.width,
+                combined_h=item.height,
+                stem=item.path.stem,
+                located=located,
+                missing=missing,
+                standin=False,
+            )
+            if analysis is not None:
+                entry["missing_cells"] = [_missing_row(cell) for cell in analysis.missing]
+        elif preview_path is not None and preview_standins:
+            write_previews(
+                preview_dir=preview_path,
+                combined=item.path,
+                combined_w=item.width,
+                combined_h=item.height,
+                stem=item.path.stem,
+                located=[],
+                missing=[],
+                standin=True,
+                standin_only=True,
+            )
+        if plan_path is not None:
+            plans = list(analysis.plans) if will_recreate and analysis is not None else []
+            stand_w, stand_h = standin_size(item.width, item.height, max_dim)
+            estimated = item.size * (stand_w * stand_h) / max(1, item.pixels) / (1024 * 1024)
+            zip_target = ""
+            expected_zip = ""
+            if zip_needed:
+                zip_target = str(item.path.with_name(item.path.name + ".zip").resolve())
+                expected_zip = str(entry["mb"])
+            plan_rows.append(
+                {
+                    "path": entry["original_path"],
+                    "mb": str(entry["mb"]),
+                    "wxh": f"{item.width}x{item.height}",
+                    "combined": "true" if combined else "false",
+                    "parts_found": found,
+                    "confidence": confidence or "",
+                    "action": action,
+                    "recreate_markers": " ".join(plan.marker for plan in plans),
+                    "recreate_targets": " | ".join(
+                        f"{plan.target} {plan.width}x{plan.height}" for plan in plans
+                    ),
+                    "standin_wxh": f"{stand_w}x{stand_h}",
+                    "estimated_standin_mb": f"{estimated:.3f}",
+                    "standin_mb_note": "estimate from pixel ratio",
+                    "zip_target": zip_target,
+                    "expected_zip_mb": expected_zip,
+                }
+            )
         if apply and not _outputs_present(entry, zip_needed):
-            try:
-                _apply_one(
-                    entry,
-                    item,
-                    max_dim=max_dim,
-                    quality=quality,
-                    proxy_suffix=proxy_suffix,
-                    zip_needed=zip_needed,
-                    recycle=recycler,
-                )
-            except Exception as exc:
+            verify_message = ""
+            if confidence and "target exists" in confidence:
                 entry["status"] = "error"
-                entry["error"] = f"{type(exc).__name__}: {exc}"
+                entry["error"] = confidence
                 error_count += 1
-        public = dict(entry)
-        public["action"] = _action(zip_needed)
-        rows.append(public)
+            else:
+                if will_recreate and analysis is not None:
+                    try:
+                        made, verified, verify_message = _write_recreations(item, analysis, quality)
+                        entry["recreated_parts"] = made
+                        if verified:
+                            entry["parts_found"] = "yes"
+                        else:
+                            zip_needed = False
+                    except Exception as exc:
+                        entry["status"] = "error"
+                        entry["error"] = f"{type(exc).__name__}: {exc}"
+                        error_count += 1
+                if entry.get("status") != "error":
+                    try:
+                        _apply_one(
+                            entry,
+                            item,
+                            max_dim=max_dim,
+                            quality=quality,
+                            proxy_suffix=proxy_suffix,
+                            zip_needed=zip_needed,
+                            recycle=recycler,
+                        )
+                    except Exception as exc:
+                        entry["status"] = "error"
+                        entry["error"] = f"{type(exc).__name__}: {exc}"
+                        error_count += 1
+                    if verify_message and entry.get("status") != "error":
+                        entry["status"] = "error"
+                        entry["error"] = verify_message
+                        error_count += 1
+                    elif verify_message:
+                        entry["error"] = verify_message
+        rows.append(dict(entry))
 
     if record:
         kept = [entry for sha, entry in by_sha.items() if sha not in touched]
         entries = list(by_sha[sha] for sha in touched) + kept
         entries.sort(key=lambda entry: entry["original_path"].casefold())
         save_register(reg_path, {"schema": document["schema"], "entries": entries})
+    if plan_path is not None:
+        plan_path.parent.mkdir(parents=True, exist_ok=True)
+        with plan_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(_PLAN_FIELDS))
+            writer.writeheader()
+            writer.writerows(plan_rows)
 
     mode = "apply" if apply else "record" if record else "dry-run"
     payload = {

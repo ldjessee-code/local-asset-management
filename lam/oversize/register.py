@@ -45,6 +45,18 @@ ENTRY_FIELDS = (
     "first_seen",
     "updated",
     "paths_seen",
+    "part_scope",
+    "scale",
+    "coverage_pct",
+    "padding_px",
+    "located_parts",
+    "rejected_candidates",
+    "duplicate_candidates",
+    "missing_cells",
+    "recreated_parts",
+    "misnamed_parts",
+    "confidence",
+    "action",
 )
 
 
@@ -120,7 +132,7 @@ def export_csv(path: Path, entries: list[dict]) -> None:
         writer = csv.DictWriter(handle, fieldnames=list(ENTRY_FIELDS))
         writer.writeheader()
         for entry in entries:
-            writer.writerow({key: _csv_value(entry[key]) for key in ENTRY_FIELDS})
+            writer.writerow({key: _csv_value(entry.get(key)) for key in ENTRY_FIELDS})
 
 
 def _csv_value(value: object) -> object:
@@ -129,5 +141,9 @@ def _csv_value(value: object) -> object:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, list):
+        if value and isinstance(value[0], dict):
+            return json.dumps(value, ensure_ascii=False)
         return " | ".join(str(item) for item in value)
+    if isinstance(value, dict):
+        return json.dumps(value, ensure_ascii=False)
     return value
