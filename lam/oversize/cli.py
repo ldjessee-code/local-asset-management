@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import sys
 
+from lam.log import finish_run, start_run
 from lam.oversize.engine import format_table, run_oversize_scan
 from lam.oversize.errors import OversizeError
 from lam.oversize.register import export_csv, load_register, resolve_register_path
@@ -117,19 +118,27 @@ def _list_command(args) -> int:
     path = resolve_register_path(args.register)
     if not path.is_file():
         raise OversizeError(f"register not found: {path}")
-    document = load_register(path)
-    entries = document["entries"]
-    if args.status:
-        entries = [entry for entry in entries if entry["status"] == args.status]
-    if args.csv:
-        export_csv(path=path_of(args.csv), entries=entries)
-        print(str(path_of(args.csv).resolve()), file=sys.stderr)
-    payload = {"schema": document["schema"], "entries": entries}
-    if args.json:
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
-    elif not args.csv:
-        print(f"entries={len(entries)} register={path.resolve()}")
-    return 0
+    run = start_run("oversize-list", path.parent)
+    ok = failed = 0
+    try:
+        document = load_register(path)
+        entries = document["entries"]
+        if args.status:
+            entries = [entry for entry in entries if entry["status"] == args.status]
+        if args.csv:
+            export_csv(path=path_of(args.csv), entries=entries)
+            print(str(path_of(args.csv).resolve()), file=sys.stderr)
+        payload = {"schema": document["schema"], "entries": entries}
+        if args.json:
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        elif not args.csv:
+            print(f"entries={len(entries)} register={path.resolve()}")
+        ok = len(entries)
+        return 0
+    finally:
+        if sys.exc_info()[0] is not None:
+            failed = 1
+        finish_run(run, ok=ok, skipped=0, failed=failed)
 
 
 def path_of(value: str):

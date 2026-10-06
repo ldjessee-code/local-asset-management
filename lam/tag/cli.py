@@ -6,6 +6,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from lam.log import finish_run, start_run
 from lam.tag.bins import (
     DEFAULT_BURST_SECONDS,
     DEFAULT_MAX_IMAGE_BYTES,
@@ -49,6 +50,10 @@ def add_tag_parser(subparsers) -> None:
 
 
 def run_tag_command(args) -> int:
+    command = "tag-scan" if args.tag_cmd == "scan" else "tag-plan" if args.tag_cmd == "plan" else "tag"
+    out = Path(getattr(args, "out", "") or ".")
+    run = start_run(command, out.parent)
+    ok = skipped = failed = 0
     try:
         if args.tag_cmd == "scan":
             tagger = None
@@ -70,6 +75,7 @@ def run_tag_command(args) -> int:
             )
             print(str(Path(args.out).resolve()))
             print(f"files={len(document['files'])} model={document['model']}", file=sys.stderr)
+            ok = len(document["files"])
             return 0
         if args.tag_cmd == "plan":
             built = run_tag_plan(
@@ -82,16 +88,24 @@ def run_tag_command(args) -> int:
             )
             print(str(Path(built["plan_path"]).resolve()))
             moves = sum(1 for action in built["plan"]["actions"] if action["op"] == "move")
+            actions = len(built["plan"]["actions"])
             print(
-                f"actions={len(built['plan']['actions'])} moves={moves} review={len(built['review']['items'])}",
+                f"actions={actions} moves={moves} review={len(built['review']['items'])}",
                 file=sys.stderr,
             )
+            ok = moves
+            skipped = actions - moves
             return 0
+        print("unknown tag command", file=sys.stderr)
+        failed = 1
+        return 2
     except TagError as exc:
         print(str(exc), file=sys.stderr)
+        failed = 1
         return 2
     except OSError as exc:
         print(str(exc), file=sys.stderr)
+        failed = 1
         return 2
-    print("unknown tag command", file=sys.stderr)
-    return 2
+    finally:
+        finish_run(run, ok=ok, skipped=skipped, failed=failed)

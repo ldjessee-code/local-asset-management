@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from lam.hashing import sha256_full
+from lam.log import finish_run, start_run
 from lam.schema_lite import validate_json
 from lam.schemas import registry as schema_registry
 from lam.schemas.registry import PLAN_SCHEMA_ID, RESULTS_SCHEMA_ID
@@ -918,7 +919,9 @@ def run_file_actions(
         undo_path = _choose_undo_path(out_path, undo_log_path)
         undo_fh, undo_writer = _open_undo_log(undo_path)
 
+    run = start_run("actions-run", out_path.parent)
     stopping = False
+    completed = False
     try:
         for index, action in enumerate(data["actions"]):
             if stopping:
@@ -988,32 +991,43 @@ def run_file_actions(
                         state.mark_present(prep.dst, "file", size=prep.size, sha256=prep.sha256)
                 if stop_on_error:
                     stopping = True
+
+        finished = local_iso_now()
+        summary = _summarize(items)
+        results = _results_body(
+            plan=str(plan_path),
+            mode=mode,
+            started=started,
+            finished=finished,
+            summary=summary,
+            items=items,
+            plan_schema=plan_schema,
+            warnings=warnings,
+        )
+        _write_results(out_path, results)
+        results["_results_path"] = str(out_path)
+        if undo_path is not None:
+            results["_undo_log_path"] = str(undo_path)
+        _print_summary(summary, mode, log)
+        log(f"results: {out_path}")
+        if undo_path is not None:
+            log(f"undo-log: {undo_path}")
+        code = 1 if summary["failed"] or summary["would_fail"] else 0
+        completed = True
+        return results, code
     finally:
         if undo_fh is not None:
             undo_fh.close()
-
-    finished = local_iso_now()
-    summary = _summarize(items)
-    results = _results_body(
-        plan=str(plan_path),
-        mode=mode,
-        started=started,
-        finished=finished,
-        summary=summary,
-        items=items,
-        plan_schema=plan_schema,
-        warnings=warnings,
-    )
-    _write_results(out_path, results)
-    results["_results_path"] = str(out_path)
-    if undo_path is not None:
-        results["_undo_log_path"] = str(undo_path)
-    _print_summary(summary, mode, log)
-    log(f"results: {out_path}")
-    if undo_path is not None:
-        log(f"undo-log: {undo_path}")
-    code = 1 if summary["failed"] or summary["would_fail"] else 0
-    return results, code
+        counts = _summarize(items)
+        failed = counts["failed"] + counts["would_fail"]
+        if not completed:
+            failed = max(failed, 1)
+        finish_run(
+            run,
+            ok=counts["ok"] + counts["would_ok"],
+            skipped=counts["skipped"],
+            failed=failed,
+        )
 
 
 def _read_undo_csv(path: Path) -> list[dict[str, str]]:

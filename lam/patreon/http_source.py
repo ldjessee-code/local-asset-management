@@ -27,6 +27,30 @@ from lam.patreon.errors import (
 )
 from lam.patreon.parse import FILE_RELATIONSHIPS, MediaItem, ParsedPage, PostRecord, parse_posts_page
 from lam.patreon.safe_download import DownloadResult, DownloadSizeError, write_atomic
+class _SecretLogFilter(logging.Filter):
+    """Leave httpx at its own level. Scrub cookie-like text and keep the record."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            rendered = record.getMessage()
+        except Exception:
+            return True
+        lowered = rendered.casefold()
+        if "session_id=" in lowered or "cookie" in lowered or "authorization" in lowered:
+            record.msg = "<redacted>"
+            record.args = ()
+        return True
+
+
+def _install_http_redact_filter() -> None:
+    redactor = _SecretLogFilter()
+    for name in ("httpx", "httpcore"):
+        logger = logging.getLogger(name)
+        if any(isinstance(item, _SecretLogFilter) for item in logger.filters):
+            continue
+        logger.addFilter(redactor)
+
+
 from lam.token.http_signals import (
     classify_response,
     content_type,
@@ -397,10 +421,7 @@ class HttpPatreonSource:
 
     def _http(self):
         if self._client is None:
-            import logging
-
-            logging.getLogger("httpx").setLevel(logging.CRITICAL)
-            logging.getLogger("httpcore").setLevel(logging.CRITICAL)
+            _install_http_redact_filter()
             if self._transport is not None:
                 import httpx
 

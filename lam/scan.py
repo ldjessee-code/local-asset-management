@@ -16,6 +16,7 @@ from pathlib import Path
 from lam.config import LibraryConfig, ensure_dirs
 from lam.db import connect, reset_scan_tables, set_meta
 from lam.hashing import hash_size_collisions
+from lam.log import finish_run, log_file_event, start_run
 from lam.util import posix, split_bundle_pack, utc_now
 from lam.walk import walk_files
 from lam.zips import index_zip_file
@@ -37,6 +38,27 @@ def run_scan(cfg: LibraryConfig, progress: Progress | None = None, *, deep: bool
     also hashes size collisions. Returns counts (files, dupes, zips, …).
     """
     ensure_dirs(cfg)
+    run = start_run("scan", cfg.log_dir)
+    outcome: dict = {"files": 0, "errors": 0}
+    completed = False
+    try:
+        outcome = _scan_impl(cfg, progress, run=run, deep=deep)
+        completed = True
+        return outcome
+    finally:
+        failed = int(outcome.get("errors") or 0)
+        if not completed:
+            failed = max(failed, 1)
+        finish_run(run, ok=int(outcome.get("files") or 0), skipped=0, failed=failed)
+
+
+def _scan_impl(
+    cfg: LibraryConfig,
+    progress: Progress | None,
+    *,
+    run,
+    deep: bool,
+) -> dict:
     t0 = time.monotonic()
     conn = connect(cfg.index_db)
     reset_scan_tables(conn)
@@ -57,6 +79,14 @@ def run_scan(cfg: LibraryConfig, progress: Progress | None = None, *, deep: bool
     def on_error(path: str, message: str) -> None:
         errors.append((path, message))
         conn.execute("INSERT INTO scan_errors(path, error) VALUES(?,?)", (path, message))
+        log_file_event(
+            run,
+            "warning",
+            "stat",
+            path,
+            ok=False,
+            func="lam.scan.on_error",
+        )
 
     seen = 0
     batch: list[tuple] = []

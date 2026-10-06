@@ -155,6 +155,21 @@ def test_sha256_match_and_mismatch(tmp_path: Path):
     assert not dst_bad.exists()
 
 
+def test_actions_stderr_has_one_final_line(tmp_path: Path, capsys):
+    src = tmp_path / "src.txt"
+    dst = tmp_path / "dst.txt"
+    src.write_text("hello", encoding="utf-8")
+    plan = _plan(tmp_path / "plan.json", [{"op": "copy", "src": str(src), "dst": str(dst)}])
+    _results, code, _lines, _path, _undo = _run(plan, tmp_path, "final", apply=True)
+    assert code == 0
+    assert dst.read_text(encoding="utf-8") == "hello"
+    finals = [line for line in capsys.readouterr().err.splitlines() if line.startswith("FINAL ")]
+    assert len(finals) == 1
+    assert "command=actions-run" in finals[0]
+    assert "failed=0" in finals[0]
+    assert "log=" in finals[0]
+
+
 def test_destination_exists_never_overwritten(tmp_path: Path):
     src = tmp_path / "src.txt"
     dst = tmp_path / "dst.txt"
