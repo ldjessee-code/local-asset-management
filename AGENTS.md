@@ -177,7 +177,7 @@ do not call the real Recycle Bin.
 
 | Claim | Where |
 |---|---|
-| Threshold is bytes OR pixels; non-images, zips, proxy names, `.git`, and symlinks are skipped | `tests/oversize/test_threshold.py` |
+| Threshold is bytes OR pixels; non-images, zips, proxy names, `.git`, symlinks, and `_Originals_Zipped` are skipped | `tests/oversize/test_threshold.py`, `tests/oversize/test_zip_layout.py` |
 | Header width and height for JPEG and PNG | `tests/oversize/test_dimensions.py` |
 | Combined by name or by parts; `yes` / `partial` / `no`; fewer pixels; set depth | `tests/oversize/test_classify.py` |
 | 35-row court classification (`combined`, `parts_found`, part names) | `tests/oversize/test_court_rows.py` |
@@ -189,7 +189,9 @@ do not call the real Recycle Bin.
 | `lam-oversize-register/v1` in the registry, `lam capabilities`, this file, and `docs/oversize.md` | `tests/oversize/test_capabilities.py`, `tests/oversize/test_docs.py` |
 | Pack scope finds parts in other sets; set scope does not; duplicate markers collapse to one | `tests/oversize/test_locate.py` |
 | Located origin within 2 px and scale within 1%; a foreign name-match is rejected; a flat part is below min-score | `tests/oversize/test_locate.py` |
+| A left/right or top/bottom half locates at scale 1 and is confident; a full row whose reading orders agree is confident; refine keeps a one-pixel thumbnail correction on a large sheet; a flat border on a 2x2 stays confident | `tests/oversize/test_locate.py` |
 | Complete set zips; one missing lattice cell is recreated; an ambiguous letter order recreates nothing | `tests/oversize/test_locate.py` |
+| Zip names drop the image extension and collapse whitespace; the member name stays the original; zips mirror under `_Originals_Zipped` or `--zip-root`; a file outside that parent is refused; dry-run creates no zip folders | `tests/oversize/test_zip_layout.py` |
 | A misnamed part is kept; dry-run previews and the plan CSV do not touch the tree; a recreate target is never overwritten | `tests/oversize/test_locate.py` |
 | New register fields are schema-valid and a phase-1 register still loads; court rows keep phase-1 results under `--part-scope set`, and pack scope name-matches Citadel A–D and Dwarven pt1–pt9 | `tests/oversize/test_locate.py`, `tests/oversize/test_court_rows.py` |
 

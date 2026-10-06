@@ -50,6 +50,15 @@ def add_oversize_parser(subparsers) -> None:
     scan.add_argument("--preview-dir", default=None, help="Write check previews here. Allowed on a dry run. Must not be inside FOLDER")
     scan.add_argument("--preview-standins", action="store_true", help="Also write a stand-in preview for maps that are not combined")
     scan.add_argument("--plan-out", default=None, help="Write a plan CSV. Allowed on a dry run. Refuses to overwrite")
+    scan.add_argument(
+        "--zip-root",
+        default=None,
+        help=(
+            "Folder for verified zips. Default: FOLDER\\_Originals_Zipped. "
+            "Each zip mirrors the original's directory relative to this folder's parent. "
+            "Parent folders are created only with --apply."
+        ),
+    )
     scan.add_argument("--json", action="store_true", help="Print JSON instead of a table")
 
     listing = commands.add_parser("list", help="Print or export the register. Does not scan.")
@@ -81,6 +90,7 @@ def run_oversize_command(args) -> int:
                 preview_dir=args.preview_dir,
                 preview_standins=args.preview_standins,
                 plan_out=args.plan_out,
+                zip_root=args.zip_root,
             )
             if args.json:
                 print(json.dumps(payload, indent=2, ensure_ascii=False))

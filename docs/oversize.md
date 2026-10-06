@@ -32,6 +32,7 @@ lam oversize scan FOLDER [--min-mb 100] [--min-mp 89] [--max-dim 8000]
                          [--register PATH]
                          [--record] [--apply]
                          [--zip {combined-with-parts,combined,all,none}]
+                         [--zip-root PATH]
                          [--proxy-suffix _max8000] [--quality 90] [--json]
 
 lam oversize list [--register PATH] [--csv OUT.csv]
@@ -62,9 +63,10 @@ An image is oversize when either test is true:
 
 Extensions: `.jpg` `.jpeg` `.png` `.webp` `.tif` `.tiff`.
 
-Skipped: directories named `.git`, symlinks, junctions, `.zip` files,
-files whose stem already ends with the proxy suffix, and any path the
-register already lists as a proxy.
+Skipped: directories named `.git`, directories named `_Originals_Zipped`
+(any case, at any depth), symlinks, junctions, `.zip` files, files whose
+stem already ends with the proxy suffix, and any path the register already
+lists as a proxy.
 
 ## The set
 
@@ -153,7 +155,8 @@ The proxy is written next to the original as `<stem><proxy-suffix><ext>`.
 
 An existing file is never overwritten. If the preferred proxy or zip name
 is already taken, and it is not this file's registered proxy or zip, the
-command uses `<name>_2`, then `_3`, and so on.
+command uses `<name>_2`, then `_3`, and so on. Two originals in one run
+that clean to the same zip name share that rule.
 
 Zip (default `--zip combined-with-parts`):
 
@@ -164,12 +167,34 @@ Zip (default `--zip combined-with-parts`):
 | `all` | every oversize file |
 | `none` | nothing |
 
-The zip is `<original filename>.zip` beside the original, `ZIP_STORED`,
-one member named as the original file. JPEG pixels do not compress, so
-store avoids a useless pass. The command reopens the zip, runs `testzip()`,
-streams the member, and compares its SHA-256 to the hash from the scan.
-Only a match calls the Recycle Bin (`lam.actions.recycle_path`, or
-`send2trash` when that package is installed). There is no hard delete.
+The zip file name is the original file name with the image extension
+removed, each run of whitespace turned into `_`, and repeated `_` collapsed,
+then `.zip`. `MalatranTombEntrance_Night Light_Gridless.jpg` becomes
+`MalatranTombEntrance_Night_Light_Gridless.zip`. The member inside the zip
+keeps the original file name, so a restore writes that name back.
+
+Every zip goes under one root. `--zip-root PATH` sets it. The default is
+`<scan folder>\_Originals_Zipped`. The zip's directory is the original's
+directory relative to the zip root's parent, so the mirror starts with the
+first folder under that parent. Scanning `<library>\2019` with
+`--zip-root <library>\_Originals_Zipped` still writes
+`<library>\_Originals_Zipped\2019\...\Night_Light_Gridless.zip`. Folder
+names are copied as they are. Only the zip file name is cleaned. Parent
+folders are created only with `--apply`. A dry run records the path and
+creates nothing.
+
+An original that is not under the zip root's parent is refused for that
+file (`refused: original is outside the zip root parent`). No zip is
+written. With `--apply` that file is `status=error` and the process exits
+4 after the other files are still processed. The stand-in proxy is still
+written.
+
+The zip is `ZIP_STORED`, one member named as the original file. JPEG pixels
+do not compress, so store avoids a useless pass. The command reopens the
+zip, runs `testzip()`, streams the member, and compares its SHA-256 to the
+hash from the scan. Only a match calls the Recycle Bin
+(`lam.actions.recycle_path`, or `send2trash` when that package is
+installed). There is no hard delete.
 
 On a mismatch or any other error the original stays put, that entry is
 `status=error` with the reason, and the command continues with the next
@@ -374,4 +399,4 @@ lettered parts prints `parts=no` and keeps its original next to the proxy.
 - Recycle is the Windows Recycle Bin (recoverable), never a permanent delete.
 - Existing proxies, zips, previews, and recreated parts are not overwritten.
 - A recreated part that fails the 0.98 check is left on disk. It is not deleted.
-- `.git`, symlinks, and junctions are not walked.
+- `.git`, `_Originals_Zipped`, symlinks, and junctions are not walked.

@@ -207,7 +207,8 @@ def test_never_overwrite_proxy_or_zip(tmp_path: Path, write_image):
     write_image(root / "Set" / "Map_B_Day.jpg", 8, 8)
     blocker = root / "Set" / "Map_Day_max8000.jpg"
     blocker.write_bytes(b"keep-proxy")
-    zip_blocker = root / "Set" / "Map_Day.jpg.zip"
+    zip_blocker = root / "_Originals_Zipped" / "Set" / "Map_Day.zip"
+    zip_blocker.parent.mkdir(parents=True, exist_ok=True)
     zip_blocker.write_bytes(b"keep-zip")
     recycled: list[Path] = []
 
@@ -230,7 +231,7 @@ def test_never_overwrite_proxy_or_zip(tmp_path: Path, write_image):
     assert blocker.read_bytes() == b"keep-proxy"
     assert zip_blocker.read_bytes() == b"keep-zip"
     assert Path(item["proxy_path"]).name == "Map_Day_max8000_2.jpg"
-    assert Path(item["zip_path"]).name == "Map_Day.jpg_2.zip"
+    assert Path(item["zip_path"]).name == "Map_Day_2.zip"
     assert not original.exists()
 
 

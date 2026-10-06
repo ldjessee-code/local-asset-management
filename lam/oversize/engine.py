@@ -14,6 +14,7 @@ import gc
 import hashlib
 import math
 import os
+import re
 import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -107,7 +108,7 @@ def _is_reparse(entry: os.DirEntry) -> bool:
 
 
 def iter_files(root: Path):
-    """Yield files under *root*. Skip ``.git``, symlinks, and junctions."""
+    """Yield files under *root*. Skip ``.git``, ``_Originals_Zipped``, symlinks, and junctions."""
     stack = [root]
     while stack:
         current = stack.pop()
@@ -124,6 +125,10 @@ def iter_files(root: Path):
                 if _is_reparse(entry):
                     continue
                 if entry.is_dir(follow_symlinks=False):
+                    # Zips of originals live here. Walking it would see the
+                    # archive tree as more source images.
+                    if entry.name.casefold() == "_originals_zipped":
+                        continue
                     stack.append(Path(entry.path))
                 elif entry.is_file(follow_symlinks=False):
                     yield Path(entry.path), entry.stat(follow_symlinks=False)
@@ -263,18 +268,68 @@ def _merge(old: dict | None, fresh: dict, now: str) -> dict:
     return merged
 
 
-def _allocate(preferred: Path, keep: Path | None) -> Path:
+def zip_archive_name(filename: str) -> str:
+    """Image name with the extension removed, whitespace collapsed, plus ``.zip``.
+
+    ``Night Light.jpg`` becomes ``Night_Light.zip``. The member inside the
+    archive stays the original file name.
+    """
+    name = Path(filename).name
+    suffix = Path(name).suffix
+    if suffix.lower() in IMAGE_EXTENSIONS:
+        name = name[: -len(suffix)]
+    cleaned = re.sub(r"\s+", "_", name)
+    cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+    if not cleaned:
+        cleaned = "image"
+    return f"{cleaned}.zip"
+
+
+def _allocate(preferred: Path, keep: Path | None, reserved: set[str] | None = None) -> Path:
+    def taken(path: Path) -> bool:
+        if path.exists():
+            return True
+        return reserved is not None and _norm(path) in reserved
+
     if keep is not None and keep.is_file():
+        if reserved is not None:
+            reserved.add(_norm(keep))
         return keep
-    if not preferred.exists():
+    if not taken(preferred):
+        if reserved is not None:
+            reserved.add(_norm(preferred))
         return preferred
     number = 2
     while number <= 1000:
         candidate = preferred.with_name(f"{preferred.stem}_{number}{preferred.suffix}")
-        if not candidate.exists():
+        if not taken(candidate):
+            if reserved is not None:
+                reserved.add(_norm(candidate))
             return candidate
         number += 1
     raise OversizeError(f"no free name near {preferred}")
+
+
+def _plan_zip(
+    original: Path,
+    zip_root: Path,
+    keep: Path | None,
+    reserved: set[str],
+) -> tuple[Path | None, str | None]:
+    """Mirror *original* under *zip_root*. Refuse a file outside that root's parent.
+
+    The mirror is the original's directory relative to the folder that
+    contains ``_Originals_Zipped`` (the zip root's parent), so a scan of
+    ``<library>\\2019`` with the zip root ``<library>\\_Originals_Zipped``
+    still starts at ``2019\\...``. Only the zip file name is cleaned.
+    """
+    anchor = zip_root.parent
+    try:
+        relative_parent = original.resolve().parent.relative_to(anchor.resolve())
+    except ValueError:
+        return None, "refused: original is outside the zip root parent"
+    preferred = zip_root / relative_parent / zip_archive_name(original.name)
+    return _allocate(preferred, keep, reserved), None
 
 
 def _write_zip(src: Path, dest: Path) -> None:
@@ -302,7 +357,18 @@ def verify_zip(zip_path: Path, original: Path, expected_sha: str) -> None:
             raise ZipVerifyError("zip sha256 mismatch")
 
 
-def _apply_one(entry: dict, item: Seen, *, max_dim: int, quality: int, proxy_suffix: str, zip_needed: bool, recycle: RecycleFn) -> None:
+def _apply_one(
+    entry: dict,
+    item: Seen,
+    *,
+    max_dim: int,
+    quality: int,
+    proxy_suffix: str,
+    zip_needed: bool,
+    recycle: RecycleFn,
+    zip_path: Path | None = None,
+    zip_block: str | None = None,
+) -> None:
     keep_proxy = Path(entry["proxy_path"]) if entry.get("proxy_path") else None
     preferred_proxy = item.path.with_name(item.path.stem + proxy_suffix + proxy_extension(item.path))
     proxy_path = _allocate(preferred_proxy, keep_proxy if keep_proxy and keep_proxy.is_file() else None)
@@ -317,13 +383,11 @@ def _apply_one(entry: dict, item: Seen, *, max_dim: int, quality: int, proxy_suf
         entry["status"] = "done"
         entry["error"] = None
         return
-    keep_zip = None
-    if entry.get("zip_verified") and entry.get("zip_path"):
-        keep_zip = Path(entry["zip_path"])
-    preferred_zip = item.path.with_name(item.path.name + ".zip")
-    zip_path = _allocate(preferred_zip, keep_zip if keep_zip and keep_zip.is_file() else None)
+    if zip_block or zip_path is None:
+        raise OversizeError(zip_block or "refused: original is outside the zip root parent")
     # Drop libvips file handles before we read the original again on Windows.
     gc.collect()
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
     if not zip_path.is_file():
         _write_zip(item.path, zip_path)
     verify_zip(zip_path, item.path, item.sha256)
@@ -518,6 +582,7 @@ def run_oversize_scan(
     preview_standins: bool = False,
     plan_out: str | Path | None = None,
     locate: bool | None = None,
+    zip_root: str | Path | None = None,
 ) -> tuple[dict, int]:
     """Walk *folder*. Write the register only when *record* or *apply* is set.
 
@@ -543,6 +608,12 @@ def run_oversize_scan(
     root = Path(folder)
     if not root.is_dir():
         raise OversizeError(f"folder not found: {root}")
+    scan_root = root.resolve()
+    if zip_root is None:
+        zip_root_path = (scan_root / "_Originals_Zipped").resolve()
+    else:
+        zip_root_path = Path(zip_root).expanduser().resolve()
+    reserved_zips: set[str] = set()
     preview_path = Path(preview_dir).expanduser() if preview_dir else None
     plan_path = Path(plan_out).expanduser() if plan_out else None
     if preview_path is not None and is_inside(preview_path, root):
@@ -732,14 +803,23 @@ def run_oversize_scan(
                 standin=True,
                 standin_only=True,
             )
+        keep_zip = None
+        if entry.get("zip_verified") and entry.get("zip_path") and Path(entry["zip_path"]).is_file():
+            keep_zip = Path(entry["zip_path"])
+        planned_zip: Path | None = None
+        zip_block: str | None = None
+        if zip_needed:
+            planned_zip, zip_block = _plan_zip(item.path, zip_root_path, keep_zip, reserved_zips)
+            if zip_block:
+                entry["error"] = zip_block
         if plan_path is not None:
             plans = list(analysis.plans) if will_recreate and analysis is not None else []
             stand_w, stand_h = standin_size(item.width, item.height, max_dim)
             estimated = item.size * (stand_w * stand_h) / max(1, item.pixels) / (1024 * 1024)
             zip_target = ""
             expected_zip = ""
-            if zip_needed:
-                zip_target = str(item.path.with_name(item.path.name + ".zip").resolve())
+            if zip_needed and planned_zip is not None and not zip_block:
+                zip_target = str(planned_zip.resolve())
                 expected_zip = str(entry["mb"])
             plan_rows.append(
                 {
@@ -790,6 +870,8 @@ def run_oversize_scan(
                             proxy_suffix=proxy_suffix,
                             zip_needed=zip_needed,
                             recycle=recycler,
+                            zip_path=planned_zip,
+                            zip_block=zip_block,
                         )
                     except Exception as exc:
                         entry["status"] = "error"
