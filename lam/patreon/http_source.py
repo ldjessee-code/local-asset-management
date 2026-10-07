@@ -26,7 +26,39 @@ from lam.patreon.errors import (
     PatreonVerificationError,
 )
 from lam.patreon.parse import FILE_RELATIONSHIPS, MediaItem, ParsedPage, PostRecord, parse_posts_page
-from lam.token.http_signals import classify_response, safe_url_for_log, snippet_for_log
+from lam.patreon.safe_download import DownloadResult, DownloadSizeError, write_atomic
+class _SecretLogFilter(logging.Filter):
+    """Leave httpx at its own level. Scrub cookie-like text and keep the record."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            rendered = record.getMessage()
+        except Exception:
+            return True
+        lowered = rendered.casefold()
+        if "session_id=" in lowered or "cookie" in lowered or "authorization" in lowered:
+            record.msg = "<redacted>"
+            record.args = ()
+        return True
+
+
+def _install_http_redact_filter() -> None:
+    redactor = _SecretLogFilter()
+    for name in ("httpx", "httpcore"):
+        logger = logging.getLogger(name)
+        if any(isinstance(item, _SecretLogFilter) for item in logger.filters):
+            continue
+        logger.addFilter(redactor)
+
+
+from lam.token.http_signals import (
+    classify_response,
+    content_type,
+    is_html_content,
+    is_json_content,
+    safe_url_for_log,
+    snippet_for_log,
+)
 from lam.token.secret import Secret
 
 log = logging.getLogger("lam.patreon.http")
@@ -37,6 +69,10 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 )
 MAX_ATTEMPTS = 3
+# File bodies retry 429, 5xx, and timeouts. API calls stay on MAX_ATTEMPTS.
+DOWNLOAD_ATTEMPTS = 4
+# Download Retry-After is not cut down to the API retry_cap. 120s is the ceiling.
+DOWNLOAD_RETRY_CAP = 120.0
 MEMBER = "member"
 NOT_MEMBER = "not_a_member"
 UNKNOWN = "unknown"
@@ -121,6 +157,51 @@ def _log_gate(kind: str, reason: str, status: int, url: str, text: str) -> None:
         safe_url_for_log(url),
         snippet_for_log(text, 200),
     )
+
+
+class _DownloadRetry(Exception):
+    """One file-download attempt failed in a way that can be tried again."""
+
+    def __init__(self, status: int, headers) -> None:
+        super().__init__("retry")
+        self.status = int(status)
+        self.headers = headers
+
+
+def _optional_size(value) -> int | None:
+    if value is None or isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _body_text(body: bytes) -> str:
+    try:
+        return body.decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+def _header_retry_after(headers) -> float | None:
+    if headers is None:
+        return None
+    try:
+        raw = str(headers.get("Retry-After") or headers.get("retry-after") or "").strip()
+    except Exception:
+        return None
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return 5.0
 
 
 def _retry_after(headers) -> float:
@@ -340,10 +421,7 @@ class HttpPatreonSource:
 
     def _http(self):
         if self._client is None:
-            import logging
-
-            logging.getLogger("httpx").setLevel(logging.CRITICAL)
-            logging.getLogger("httpcore").setLevel(logging.CRITICAL)
+            _install_http_redact_filter()
             if self._transport is not None:
                 import httpx
 
@@ -487,26 +565,163 @@ class HttpPatreonSource:
         return page.posts[0] if page.posts else None
 
     def download(self, media: MediaItem, dest: Path) -> str:
-        if not media.url.startswith(("http://", "https://")):
+        """Save ``media`` to ``dest`` and return the sha256 hex digest.
+
+        Delegates to ``download_atomic``. A leftover temp is overwritten, so
+        this no longer raises ``FileExistsError`` for a previous attempt.
+        """
+        return self.download_atomic(media, dest).sha256
+
+    def download_atomic(
+        self,
+        media: MediaItem,
+        dest: Path,
+        *,
+        expected_size: int | None = None,
+    ) -> DownloadResult:
+        """Stream ``media`` to ``<dest>.partial`` and rename it onto ``dest``.
+
+        A non-empty ``dest`` whose size matches ``expected_size`` (or any
+        non-empty file when ``expected_size`` is omitted) is returned without
+        a request. 429, 5xx, and timeouts retry up to four times. Auth,
+        challenge, and verification errors are raised on the first response.
+        """
+        if not str(media.url or "").startswith(("http://", "https://")):
             raise OSError("download failed")
-        response = self._request("GET", media.url)
-        digest = hashlib.sha256()
-        try:
-            iterator = response.iter_bytes()
-        except Exception:
-            iterator = None
-        with dest.open("xb") as handle:
-            if iterator is None:
-                body = getattr(response, "content", b"") or b""
-                handle.write(body)
-                digest.update(body)
+        dest = Path(dest)
+        expected = _optional_size(expected_size)
+        if dest.is_file():
+            size = int(dest.stat().st_size)
+            if size > 0 and (expected is None or size == expected):
+                return DownloadResult(
+                    path=dest,
+                    sha256=_sha256_file(dest),
+                    size=size,
+                    skipped_existing=True,
+                    resumed=False,
+                )
+        last_status = 0
+        last_headers = None
+        for attempt in range(DOWNLOAD_ATTEMPTS):
+            if attempt == 0:
+                self._pause()
             else:
-                for chunk in iterator:
-                    if not chunk:
-                        continue
-                    handle.write(chunk)
-                    digest.update(chunk)
-        return digest.hexdigest()
+                delay = self._download_backoff(attempt, last_status, last_headers)
+                if delay > 0:
+                    self._clock.sleep(delay)
+            self._calls += 1
+            try:
+                return self._stream_download(str(media.url), dest, expected)
+            except _DownloadRetry as retry:
+                last_status = retry.status
+                last_headers = retry.headers
+                if attempt + 1 >= DOWNLOAD_ATTEMPTS:
+                    break
+            except (PatreonAuthError, PatreonChallengeError, PatreonVerificationError):
+                raise
+        if last_status == 429:
+            raise PatreonRateLimitError(GATE_RATE) from None
+        raise PatreonNetworkError(GATE_NETWORK) from None
+
+    def _download_backoff(self, attempt: int, status: int, headers) -> float:
+        """Seconds to wait before try number ``attempt`` (0-based).
+
+        A ``Retry-After`` header wins. It is not limited by ``retry_cap``
+        (that cap is for API calls). The ceiling is ``DOWNLOAD_RETRY_CAP``.
+        """
+        parsed = _header_retry_after(headers)
+        if parsed is not None:
+            delay = parsed
+        elif status == 429:
+            delay = 5.0
+        else:
+            delay = float(2 ** max(attempt - 1, 0))
+        if delay < self._min_delay:
+            delay = self._min_delay
+        if delay > DOWNLOAD_RETRY_CAP:
+            delay = DOWNLOAD_RETRY_CAP
+        return delay
+
+    def _stream_download(self, url: str, dest: Path, expected: int | None) -> DownloadResult:
+        headers = {
+            "Cookie": self._cookie.reveal(),
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json, text/html;q=0.8",
+        }
+        try:
+            with self._http().stream("GET", url, headers=headers) as response:
+                return self._consume_download(response, dest, expected)
+        except _DownloadRetry:
+            raise
+        except (PatreonAuthError, PatreonChallengeError, PatreonVerificationError, DownloadSizeError):
+            raise
+        except Exception as exc:
+            # DownloadSizeError is an OSError, so it must be re-raised above.
+            # A dropped connection or timeout is safe to try again.
+            if _is_network(exc):
+                raise _DownloadRetry(0, None) from None
+            raise PatreonNetworkError(GATE_NETWORK) from None
+
+    def _consume_download(self, response, dest: Path, expected: int | None) -> DownloadResult:
+        status = int(getattr(response, "status_code", 0) or 0)
+        resp_headers = getattr(response, "headers", None)
+        resp_url = str(getattr(response, "url", "") or "")
+        if not (200 <= status < 300):
+            text = _body_text(response.read())
+            self._raise_or_retry_download(status, text, resp_headers, resp_url)
+        ctype = content_type(resp_headers)
+        if is_html_content(ctype, "") or is_json_content(ctype):
+            body = response.read()
+            text = _body_text(body)
+            self._raise_immediate_gate(status, text, resp_headers, resp_url)
+            return write_atomic(dest, [body], expected_size=expected)
+        self._raise_immediate_gate(status, "", resp_headers, resp_url)
+        return write_atomic(dest, _iter_response_bytes(response), expected_size=expected)
+
+    def _raise_or_retry_download(self, status: int, text: str, headers, url: str) -> None:
+        classified = classify_response(status=status, text=text, headers=headers, url=url)
+        if classified is not None:
+            kind, reason = classified
+            _log_gate(kind, reason, status, url, text)
+            if kind == "challenge":
+                raise PatreonChallengeError(GATE_CHALLENGE) from None
+            if kind == "verification":
+                raise PatreonVerificationError(GATE_VERIFICATION) from None
+            if kind == "auth":
+                raise PatreonAuthError(GATE_AUTH) from None
+            if kind == "rate":
+                raise _DownloadRetry(status, headers) from None
+        if status == 429 or status >= 500:
+            raise _DownloadRetry(status, headers) from None
+        raise PatreonNetworkError(GATE_NETWORK) from None
+
+    def _raise_immediate_gate(self, status: int, text: str, headers, url: str) -> None:
+        classified = classify_response(status=status, text=text, headers=headers, url=url)
+        if classified is None:
+            return
+        kind, reason = classified
+        _log_gate(kind, reason, status, url, text)
+        if kind == "challenge":
+            raise PatreonChallengeError(GATE_CHALLENGE) from None
+        if kind == "verification":
+            raise PatreonVerificationError(GATE_VERIFICATION) from None
+        if kind == "auth":
+            raise PatreonAuthError(GATE_AUTH) from None
+        if kind == "rate":
+            raise _DownloadRetry(status, headers) from None
+
+
+def _iter_response_bytes(response):
+    try:
+        iterator = response.iter_bytes()
+    except Exception:
+        iterator = None
+    if iterator is None:
+        body = getattr(response, "content", b"") or b""
+        if body:
+            yield body
+        return
+    yield from iterator
 
 
 class FixtureSource:

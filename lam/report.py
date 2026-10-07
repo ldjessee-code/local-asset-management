@@ -8,6 +8,7 @@ from collections import defaultdict
 
 from lam.config import LibraryConfig, ensure_dirs
 from lam.db import connect, get_meta
+from lam.log import finish_run, start_run
 from lam.util import utc_now
 
 
@@ -136,14 +137,26 @@ def collect_report(cfg: LibraryConfig) -> dict:
 def write_reports(cfg: LibraryConfig, data: dict | None = None) -> dict:
     """Write ``summary.md`` and ``exceptions.md`` under ``cfg.reports_dir``."""
     ensure_dirs(cfg)
-    data = data or collect_report(cfg)
-    summary = cfg.reports_dir / "summary.md"
-    exceptions = cfg.reports_dir / "exceptions.md"
-    summary.write_text(_summary_md(data), encoding="utf-8")
-    exceptions.write_text(_exceptions_md(data), encoding="utf-8")
-    data["summary_path"] = str(summary)
-    data["exceptions_path"] = str(exceptions)
-    return data
+    run = start_run("report", cfg.log_dir)
+    written = data
+    completed = False
+    try:
+        written = written or collect_report(cfg)
+        summary = cfg.reports_dir / "summary.md"
+        exceptions = cfg.reports_dir / "exceptions.md"
+        summary.write_text(_summary_md(written), encoding="utf-8")
+        exceptions.write_text(_exceptions_md(written), encoding="utf-8")
+        written["summary_path"] = str(summary)
+        written["exceptions_path"] = str(exceptions)
+        completed = True
+        return written
+    finally:
+        files = int((written or {}).get("files") or 0)
+        errors = (written or {}).get("errors") or []
+        failed = len(errors) if isinstance(errors, list) else 0
+        if not completed:
+            failed = max(failed, 1)
+        finish_run(run, ok=files, skipped=0, failed=failed)
 
 
 def _summary_md(data: dict) -> str:

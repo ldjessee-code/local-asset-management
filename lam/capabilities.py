@@ -20,6 +20,8 @@ from lam.schemas.registry import (
     SITE_PROFILES_SCHEMA_ID,
     SITE_PROFILES_SCHEMAS,
     SUBBINS_SCHEMAS,
+    OVERSIZE_REGISTER_SCHEMA_ID,
+    OVERSIZE_SCHEMAS,
     TAG_REVIEW_SCHEMAS,
     TAG_SIDECAR_SCHEMAS,
     TAGS_SCHEMAS,
@@ -121,6 +123,20 @@ COMMANDS: tuple[dict[str, Any], ...] = (
         ),
         "function": "lam.tag.cli.run_tag_command",
     },
+    {
+        "name": "oversize",
+        "config_required": False,
+        "writes": True,
+        "summary": (
+            "Proxy oversize images (lam oversize scan|list). Dry-run default. "
+            "--part-scope pack (default) locates parts across the scanned folder. "
+            "--apply writes a long-side proxy and, for a complete combined map, "
+            "can recreate a missing part, then zips the original and recycles it "
+            "after the zip verifies. Flags: --min-score --min-margin --min-coverage "
+            "--preview-dir --plan-out."
+        ),
+        "function": "lam.oversize.cli.run_oversize_command",
+    },
 )
 
 MODULES: tuple[dict[str, str], ...] = (
@@ -148,6 +164,10 @@ MODULES: tuple[dict[str, str], ...] = (
     {
         "module": "lam.tag",
         "role": "Layered sorter: lam tag scan and lam tag plan (plan only, no apply)",
+    },
+    {
+        "module": "lam.oversize",
+        "role": "Oversize image proxies and one central register (lam oversize)",
     },
 )
 
@@ -272,6 +292,18 @@ def describe_capabilities() -> dict[str, Any]:
             "dry_run_default": True,
             "never_moves_files": True,
         },
+        "oversize": {
+            "command": "lam oversize",
+            "docs": "docs/oversize.md",
+            "schema": OVERSIZE_REGISTER_SCHEMA_ID,
+            "schema_ids": status_groups(OVERSIZE_SCHEMAS),
+            "schema_registry": "lam/schemas/registry.py",
+            "scan": "lam oversize scan FOLDER",
+            "list": "lam oversize list",
+            "dry_run_default": True,
+            "needs_apply_flag": True,
+            "optional_extra": "images",
+        },
         "modules": [dict(m) for m in MODULES],
         "http": [dict(h) for h in HTTP_API],
         "public_python": list(PUBLIC_PYTHON),
@@ -349,6 +381,14 @@ def format_capabilities_text(data: dict[str, Any] | None = None) -> str:
         supported = ", ".join(groups["supported"]) or "(none)"
         deprecated = ", ".join(groups["deprecated"]) if groups["deprecated"] else "(none)"
         lines.append(f"  {key}: supported: {supported}; deprecated: {deprecated}")
+    oversize = cap["oversize"]
+    oversize_ids = oversize["schema_ids"]
+    lines += ["", "Oversize schemas:"]
+    lines.append("  supported: " + ", ".join(oversize_ids["supported"]))
+    lines.append(
+        "  deprecated: "
+        + (", ".join(oversize_ids["deprecated"]) if oversize_ids["deprecated"] else "(none)")
+    )
     lines += ["", "Not in v0.1:"]
     for item in cap["safety"]["not_in_v1"]:
         lines.append(f"  - {item}")

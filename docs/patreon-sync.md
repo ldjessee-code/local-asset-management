@@ -106,7 +106,16 @@ different bytes gets a `__<sha8>` suffix. Nothing is overwritten.
 
 A `.part` file this command created is sent to the Recycle Bin through
 `lam.actions.recycle_path`, or left in place and named in the manifest
-warnings. It is not permanently deleted.
+warnings. It is not permanently deleted. The download itself writes
+`<dest>.partial` (`lam/patreon/safe_download.py`) and `os.replace`s onto
+`dest` only after the body is complete and, when a size was given, the
+size matches. A leftover `.partial`, legacy `<name>.<ext>.partN`, or
+`.bad` / `.badN` file is overwritten on the next try. A non-empty file
+already at `dest` is kept and not requested again. 429, 5xx, and timeouts
+are retried up to four times; a `Retry-After` value is waited (ceiling
+120 seconds). Creator split names (`.001`, `.partN.rar`, `.zNN`, `Part N`)
+are not those temps. A failed `sync --apply` also recycles the `.partial`
+next to its `.lam-tmp-….part` path.
 
 Outside hosts, DRM video, files over `max_file_mb`, and posts with no
 downloadable file are `deferred`. Locked posts are `locked` (not a

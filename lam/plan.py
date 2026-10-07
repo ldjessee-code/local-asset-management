@@ -13,6 +13,7 @@ from pathlib import Path
 from lam.config import LibraryConfig, ensure_dirs
 from lam.db import connect
 from lam.layouts import confined_to, dest_path, tokens_for
+from lam.log import finish_run, start_run
 from lam.util import posix
 
 Progress = Callable[[str, dict], None]
@@ -21,6 +22,19 @@ Progress = Callable[[str, dict], None]
 def run_plan(cfg: LibraryConfig, progress: Progress | None = None) -> dict:
     """Write ``plan_rows`` in the index. Returns counts by op (copy, quarantine, …)."""
     ensure_dirs(cfg)
+    run = start_run("plan", cfg.log_dir)
+    summary: dict | None = None
+    completed = False
+    try:
+        summary = _build_plan(cfg, progress)
+        completed = True
+        return summary
+    finally:
+        rows = int((summary or {}).get("rows") or 0)
+        finish_run(run, ok=rows, skipped=0, failed=0 if completed else 1)
+
+
+def _build_plan(cfg: LibraryConfig, progress: Progress | None) -> dict:
     conn = connect(cfg.index_db)
     conn.execute("DELETE FROM plan_rows")
 

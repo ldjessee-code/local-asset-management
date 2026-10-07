@@ -10,12 +10,14 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+from lam.log import finish_run, start_run
 from lam.patreon.config import Creator, CreatorsConfig
 from lam.patreon.dates import Window, in_window, now_local
 from lam.patreon.errors import PatreonError, PatreonItemError
 from lam.patreon.http_source import UNKNOWN, apply_post_membership_fallback
 from lam.patreon.names import sanitize_component
 from lam.patreon.parse import MediaItem, PostRecord
+from lam.patreon.safe_download import temp_path_for
 from lam.schemas.registry import (
     PATREON_INDEX_SCHEMA_ID,
     PATREON_MANIFEST_SCHEMA_ID,
@@ -306,6 +308,57 @@ def _format_creator_text(block: dict, window: Window) -> list[str]:
     return lines
 
 
+def _lam_logs() -> Path:
+    raw = os.environ.get("LOCALAPPDATA")
+    base = Path(raw) if raw else Path.home() / "AppData" / "Local"
+    return base / "lam" / "logs"
+
+
+def _primary_inbox(config: CreatorsConfig, creators: tuple) -> Path:
+    day = now_local().strftime("%Y%m%d")
+    if not creators:
+        return Path(config.staging_root) / "patreon" / f"_inbox_{day}"
+    creator = creators[0]
+    folder = creator.staging_folder or creator.slug
+    return Path(config.staging_root) / folder / f"_inbox_{day}"
+
+
+def _patreon_log_dir(config: CreatorsConfig, creators: tuple, *, apply: bool) -> Path:
+    if apply:
+        return _primary_inbox(config, creators)
+    return _lam_logs()
+
+
+def _tally_posts(posts: list[dict]) -> tuple[int, int, int]:
+    ok = skipped = failed = 0
+    skip = {"skipped-duplicate", "excluded", "locked", "deferred"}
+    for post in posts:
+        status = post.get("status")
+        if status == "failed":
+            failed += 1
+        elif status in skip:
+            skipped += 1
+        else:
+            ok += 1
+    return ok, skipped, failed
+
+
+def _tally_list(blocks: list[dict]) -> tuple[int, int, int]:
+    ok = skipped = failed = 0
+    for block in blocks:
+        if block.get("skipped"):
+            skipped += 1
+            continue
+        counts = block.get("counts") or {}
+        ok += int(counts.get("accessible") or 0)
+        skipped += (
+            int(counts.get("locked") or 0)
+            + int(counts.get("excluded") or 0)
+            + int(counts.get("deferred") or 0)
+        )
+    return ok, skipped, failed
+
+
 def run_list(
     config: CreatorsConfig,
     source,
@@ -317,11 +370,12 @@ def run_list(
     results_path: Path | None,
 ) -> int:
     creators = _selected_creators(config, only_slug)
-    source.whoami()
+    run = start_run("patreon-list", _patreon_log_dir(config, creators, apply=False))
     blocks = []
     warnings: list[str] = list(config.warnings)
     held: PatreonError | None = None
     try:
+        source.whoami()
         for creator in creators:
             if not creator.enabled:
                 blocks.append(
@@ -392,6 +446,10 @@ def run_list(
         print(rendered, end="" if rendered.endswith("\n") else "\n")
     if results_path is not None:
         _write_new(results_path, json.dumps(document, indent=2) + "\n")
+    ok, skipped, failed = _tally_list(blocks)
+    if held is not None:
+        failed = max(failed, 1)
+    finish_run(run, ok=ok, skipped=skipped, failed=failed)
     if held is not None:
         raise held
     return 0
@@ -408,6 +466,7 @@ def _file_row(
     url: str | None,
     host: str | None,
     downloaded_at: str | None = None,
+    reason: str | None = None,
 ) -> dict:
     if kind not in {"zip", "loose-media", "other"}:
         kind = "other"
@@ -415,7 +474,7 @@ def _file_row(
         status = "failed"
     if size is not None and not isinstance(size, int):
         size = int(size)
-    return {
+    row = {
         "name": name,
         "staging_path": staging_path,
         "size": size,
@@ -426,6 +485,9 @@ def _file_row(
         "url": url,
         "host": host,
     }
+    if reason:
+        row["reason"] = reason
+    return row
 
 
 def _link_name(url: str) -> str:
@@ -476,14 +538,16 @@ def _post_row(post: PostRecord, status: str, reason: str, files: list[dict]) -> 
 
 
 def _discard_part(part: Path, warnings: list[str]) -> None:
-    if not part.is_file():
-        return
-    try:
-        from lam.actions import recycle_path
+    """Recycle a failed staging temp and the ``.partial`` beside it."""
+    for candidate in (part, temp_path_for(part)):
+        if not candidate.is_file():
+            continue
+        try:
+            from lam.actions import recycle_path
 
-        recycle_path(part)
-    except Exception:
-        warnings.append(f"left in place: {part.name}")
+            recycle_path(candidate)
+        except Exception:
+            warnings.append(f"left in place: {candidate.name}")
 
 
 def _dest_path(directory: Path, filename: str, digest: str) -> Path:
@@ -560,14 +624,8 @@ def _stage_media(
     part = directory / f".lam-tmp-{uuid.uuid4().hex[:8]}-{filename}.part"
     try:
         digest = source.download(media, part)
-    except OSError:
+    except OSError as exc:
         _discard_part(part, warnings)
-        index["media"][media.media_id] = {
-            "sha256": "",
-            "staging_path": "",
-            "name": filename,
-            "size": 0,
-        }
         return _file_row(
             name=filename,
             staging_path=None,
@@ -577,6 +635,7 @@ def _stage_media(
             status="failed",
             url=None,
             host=None,
+            reason=f"{type(exc).__name__}: {exc}",
         )
     size = int(part.stat().st_size) if part.is_file() else 0
     prior = index["sha256"].get(digest)
@@ -677,7 +736,7 @@ def _sync_post(
     files.extend(_outside_rows(post))
     reason = ""
     if any(item["status"] == "failed" for item in files):
-        reason = "download failed"
+        reason = next((item["reason"] for item in files if item.get("reason")), "download failed")
     elif any(item["status"] == "deferred" for item in files):
         reason = "outside link: " + ", ".join(_hosts(post))
     elif all(item["status"] == "skipped-duplicate" for item in files):
@@ -775,6 +834,7 @@ def run_sync(
     csv: bool,
 ) -> int:
     creators = _selected_creators(config, only_slug)
+    run = start_run("patreon-sync", _patreon_log_dir(config, creators, apply=apply))
     mode = "apply" if apply else "dry-run"
     started = now_local().isoformat()
     stamp = now_local().strftime("%Y%m%d_%H%M%S")
@@ -861,6 +921,10 @@ def run_sync(
         _write_new(results_path, json.dumps(document, indent=2) + "\n")
         if csv and not apply:
             _write_new(Path(str(results_path) + ".csv"), _csv_text(all_posts))
+    ok, skipped, failed = _tally_posts(all_posts)
+    if held is not None:
+        failed = max(failed, 1)
+    finish_run(run, ok=ok, skipped=skipped, failed=failed)
     if held is not None:
         raise held
     if any(post["status"] == "failed" for post in all_posts):

@@ -223,6 +223,26 @@ lam tag plan tags.json --dest D:\library --level 1 --out plan.json
 lam actions run plan.json
 ```
 
+### Oversize images (`lam oversize`)
+
+`lam oversize scan FOLDER` lists images over 100 MB or over 89 MP (both
+limits are flags). It writes nothing unless you pass `--record` (the one
+register, `lam-oversize-register/v1`) or `--apply` (a proxy at most 8000 px
+on the long side, never upscaled). The default `--part-scope pack` looks
+for part maps anywhere in the scanned folder and locates them in the
+combined image. A complete combined map is zipped and the original goes to
+the Recycle Bin only after the zip verifies. When a missing cell is
+confident, `--apply` crops that part from the combined original first.
+Part maps, partial sets, and single huge maps stay loose with a stand-in.
+`--preview-dir` and `--plan-out` are allowed on a dry run.
+Details: [docs/oversize.md](docs/oversize.md).
+
+```text
+lam oversize scan D:\maps
+lam oversize scan D:\maps --apply
+lam oversize list --csv oversize.csv
+```
+
 ## Web UI
 
 The engine process serves the UI. Open it from a laptop or a phone on

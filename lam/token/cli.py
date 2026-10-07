@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import sys
 
+from lam.log import finish_run, start_run
 from lam.token.errors import EXIT_AUTH, EXIT_OK, TokenError, gate
+from lam.token.paths import localappdata
 from lam.token.session import fetch_cookies, load_active_profiles, login, site_status
 
 
@@ -99,13 +101,16 @@ def _print_status_row(row: dict) -> None:
 
 
 def run_token_command(args: argparse.Namespace) -> int:
+    cmd = getattr(args, "token_cmd", None) or "token"
+    run = start_run(f"token-{cmd}", localappdata() / "lam" / "logs")
+    ok = skipped = failed = 0
     try:
         profiles = _profiles(args)
         _print_warnings(profiles)
-        cmd = args.token_cmd
         if cmd == "login":
             login(args.site, profiles=profiles)
             print(f"{args.site}: login window closed; session stored in the persistent profile")
+            ok = 1
             return EXIT_OK
         if cmd == "get":
             site_profile, selection = fetch_cookies(
@@ -116,11 +121,13 @@ def run_token_command(args: argparse.Namespace) -> int:
             )
             _print_selection(site_profile.id, selection)
             print("  wrote secrets file: yes")
+            ok = 1
             return EXIT_OK
         if cmd == "status":
             rows = site_status(args.site, check=bool(getattr(args, "check", False)), profiles=profiles)
             if not rows:
                 print("no enabled sites", file=sys.stderr)
+                failed = 1
                 return EXIT_AUTH
             for row in rows:
                 _print_status_row(row)
@@ -133,9 +140,14 @@ def run_token_command(args: argparse.Namespace) -> int:
                     ),
                     file=sys.stderr,
                 )
+                failed = 1
                 return EXIT_AUTH
+            ok = len(rows)
             return EXIT_OK
         raise TokenError(f"GATE usage: unknown token command {cmd}")
     except TokenError as exc:
         print(str(exc), file=sys.stderr)
+        failed = 1
         return exc.exit_code
+    finally:
+        finish_run(run, ok=ok, skipped=skipped, failed=failed)

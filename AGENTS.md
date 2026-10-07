@@ -11,7 +11,8 @@ product. The browser is a remote control, not the hasher.
 - **Do** keep tests on `tmp_path` fixtures. Do not scan or write the operator’s
   real disks unless they name those paths and approve the write.
 - **Do not** add permanent delete, pHash, embeddings, or VTT-specific logic
-  in v0.1. Recycle (Recycle Bin) exists only on `lam actions` with `--apply`.
+  in v0.1. Recycle (Recycle Bin) exists on `lam actions` with `--apply`, and
+  on `lam oversize scan --apply` only after a zip of that original verifies.
 - **Do not** put hashing or copies in JavaScript/WASM.
 
 ## Safety (writes)
@@ -45,6 +46,7 @@ product. The browser is a remote control, not the hasher.
 | Site session cookies (`lam token`) | `docs/token-fetcher.md`, `lam/token/` |
 | Patreon list / sync formats | `docs/patreon-sync.md`, `lam/schemas/registry.py`, `lam/patreon/` |
 | Layered sorting (`lam tag`) | `docs/layered-sorting.md`, `lam/tag/` |
+| Oversize image proxies (`lam oversize`) | `docs/oversize.md`, `lam/oversize/` |
 | License | `LICENSE` (AGPL-3.0-or-later, unmodified FSF text) |
 
 ## JSON formats
@@ -98,6 +100,21 @@ Field reference: `docs/layered-sorting.md`. Registry: `lam/schemas/registry.py`.
 - Review list: `lam/schemas/lam-tag-review.v1.schema.json` (`lam-tag-review/v1`)
 
 Sample sub-bins (placeholder names only): `examples/subbins.sample.json`.
+
+### Oversize register (`lam-oversize-register/v1`)
+
+`lam oversize scan` finds images over a byte size or a megapixel count.
+Dry-run is the default. `--part-scope pack` (the default) searches the
+whole folder and locates parts in the combined image. `--record` writes
+one register. `--apply` also writes proxies and, for a complete combined
+map, can recreate a missing part, then zips the original and sends that
+original to the Recycle Bin only after the zip verifies. There is no
+per-image sidecar. New register fields are optional on
+`lam-oversize-register/v1`, so a phase-1 file still loads.
+
+- Register: `lam/schemas/lam-oversize-register.v1.schema.json` (`lam-oversize-register/v1`)
+
+Field reference, combined/parts rules, and exit codes: `docs/oversize.md`.
 
 ## Secrets and browser profiles
 
@@ -153,6 +170,31 @@ on a command line.
 | New schema ids in the registry and `lam capabilities` | `tests/tag/test_capabilities.py` |
 | This file and `docs/layered-sorting.md` name the schema ids | `tests/tag/test_docs.py` |
 
+## Proof (oversize)
+
+`pytest` collects `tests/oversize/`. Oversize tests block real sockets and
+do not call the real Recycle Bin.
+
+| Claim | Where |
+|---|---|
+| Threshold is bytes OR pixels; non-images, zips, proxy names, `.git`, symlinks, and `_Originals_Zipped` are skipped | `tests/oversize/test_threshold.py`, `tests/oversize/test_zip_layout.py` |
+| Header width and height for JPEG and PNG | `tests/oversize/test_dimensions.py` |
+| Combined by name or by parts; `yes` / `partial` / `no`; fewer pixels; set depth | `tests/oversize/test_classify.py` |
+| 35-row court classification (`combined`, `parts_found`, part names) | `tests/oversize/test_court_rows.py` |
+| Dry run writes nothing | `tests/oversize/test_dry_run.py` |
+| One register, every field, schema-valid, `.prev`, no duplicates, moved path | `tests/oversize/test_register.py` |
+| Proxy size, PNG stays PNG, zip-then-recycle, corrupt zip leaves the original, no hard delete, idempotent | `tests/oversize/test_apply.py` |
+| `lam oversize list --csv` export and refuse-to-overwrite | `tests/oversize/test_list.py` |
+| Exit 2 and exit 3 (`pip install pyvips-binary pyvips`) | `tests/oversize/test_exit.py` |
+| `lam-oversize-register/v1` in the registry, `lam capabilities`, this file, and `docs/oversize.md` | `tests/oversize/test_capabilities.py`, `tests/oversize/test_docs.py` |
+| Pack scope finds parts in other sets; set scope does not; duplicate markers collapse to one | `tests/oversize/test_locate.py` |
+| Located origin within 2 px and scale within 1%; a foreign name-match is rejected; a flat part is below min-score | `tests/oversize/test_locate.py` |
+| A left/right or top/bottom half locates at scale 1 and is confident; a full row whose reading orders agree is confident; refine keeps a one-pixel thumbnail correction on a large sheet; a flat border on a 2x2 stays confident | `tests/oversize/test_locate.py` |
+| Complete set zips; one missing lattice cell is recreated; an ambiguous letter order recreates nothing | `tests/oversize/test_locate.py` |
+| Zip names drop the image extension and collapse whitespace; the member name stays the original; zips mirror under `_Originals_Zipped` or `--zip-root`; a file outside that parent is refused; dry-run creates no zip folders | `tests/oversize/test_zip_layout.py` |
+| A misnamed part is kept; dry-run previews and the plan CSV do not touch the tree; a recreate target is never overwritten | `tests/oversize/test_locate.py` |
+| New register fields are schema-valid and a phase-1 register still loads; court rows keep phase-1 results under `--part-scope set`, and pack scope name-matches Citadel A–D and Dwarven pt1–pt9 | `tests/oversize/test_locate.py`, `tests/oversize/test_court_rows.py` |
+
 ## Pipeline
 
 `scan` (read-only index) → `report` → `plan` (dest paths only) → `apply`
@@ -168,7 +210,7 @@ destination tree (`lam.config.validate_config`). Setup UI can write it.
 
 ## Court queue
 
-Court file chores go through gpu-queue as work type `lam`. The court calls this repo's existing CLI (`python -m lam`) with an allowlisted argv: `capabilities`, `scan`, `report`, `plan`, `apply`, `tag scan`, and `tag plan`. This repo's code is unchanged. The queue does not call `lam patreon`, `lam token`, `lam serve`, `lam actions`, or `lam undo`, and it does not pass a delete.
+Court file chores go through gpu-queue as work type `lam`. The court calls this repo's existing CLI (`python -m lam`) with an allowlisted argv: `capabilities`, `scan`, `report`, `plan`, `apply`, `tag scan`, and `tag plan`. This repo's code is unchanged. The queue does not call `lam patreon`, `lam token`, `lam serve`, `lam actions`, `lam oversize`, or `lam undo`, and it does not pass a delete.
 
 ## Git
 
