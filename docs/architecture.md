@@ -35,6 +35,10 @@ page, writes one central register (`lam-oversize-register/v1`), and on
 `--apply` builds a proxy. A verified zip is the only path to the Recycle
 Bin. See [oversize.md](oversize.md).
 
+`lam pack` and `lam unpack` (`lam.archive`) build or extract a zip or
+tar.gz. Dry-run is the default. `--apply` never overwrites and never
+deletes. See [archive.md](archive.md).
+
 The browser talks JSON to FastAPI. Jobs run in a background thread on the
 machine that can see the disks.
 
@@ -60,6 +64,7 @@ machine that can see the disks.
 | `lam.patreon` | `lam patreon list`, `sync`, `validate-config` (inbox + manifest only) |
 | `lam.tag` | `lam tag scan` / `lam tag plan` layered sorter (writes a plan; does not move files) |
 | `lam.oversize` | `lam oversize scan` / `lam oversize list` proxies and one register |
+| `lam.archive` | `lam pack` / `lam unpack` zip and tar.gz (dry-run, manifest, never overwrite) |
 
 Public imports are listed in `lam/__init__.py`. Prefer those over private
 helpers (`_log_jsonl`, SQL strings, …).

@@ -32,6 +32,10 @@ product. The browser is a remote control, not the hasher.
   writes under a `.git` path, refuses `C:\Example`, and never permanently
   deletes. Recycle is the Windows Recycle Bin (recoverable), including the
   source of a verified cross-volume file move. `--apply` writes an undo CSV.
+- **`lam pack` and `lam unpack`** are opt-in and separate from that pipeline.
+  Dry-run is the default. `--apply` writes a new archive or extracts into a
+  folder. They never overwrite, never delete, and an unsafe member fails
+  the unpack before any file is written. See `docs/archive.md`.
 
 ## Where truth lives
 
@@ -47,6 +51,7 @@ product. The browser is a remote control, not the hasher.
 | Patreon list / sync formats | `docs/patreon-sync.md`, `lam/schemas/registry.py`, `lam/patreon/` |
 | Layered sorting (`lam tag`) | `docs/layered-sorting.md`, `lam/tag/` |
 | Oversize image proxies (`lam oversize`) | `docs/oversize.md`, `lam/oversize/` |
+| Pack / unpack archives (`lam pack`, `lam unpack`) | `docs/archive.md`, `lam/archive.py` |
 | License | `LICENSE` (AGPL-3.0-or-later, unmodified FSF text) |
 
 ## JSON formats
@@ -195,6 +200,19 @@ do not call the real Recycle Bin.
 | A misnamed part is kept; dry-run previews and the plan CSV do not touch the tree; a recreate target is never overwritten | `tests/oversize/test_locate.py` |
 | New register fields are schema-valid and a phase-1 register still loads; court rows keep phase-1 results under `--part-scope set`, and pack scope name-matches Citadel A–D and Dwarven pt1–pt9 | `tests/oversize/test_locate.py`, `tests/oversize/test_court_rows.py` |
 
+## Proof (pack / unpack)
+
+`pytest` collects `tests/test_archive.py`. Archive tests use `tmp_path` only.
+
+| Claim | Where |
+|---|---|
+| Round-trip zip and tar.gz; `--no-manifest`; excludes; `manifest.tsv` rows; `.git` left out | `tests/test_archive.py` |
+| Dry run writes nothing; existing archive is refused; verify failure leaves no final archive | `tests/test_archive.py` |
+| Zip-slip (`../x`, absolute, drive letter) and tar symlink fail before extract | `tests/test_archive.py` |
+| Conflict skip, conflict backup under `_prev/<stamp>`, unchanged, extra files left in place | `tests/test_archive.py` |
+| Manifest mismatch and external `--manifest`; one FINAL line on pass and fail | `tests/test_archive.py` |
+| `lam pack` / `lam unpack` in capabilities, this file, `README.md`, and `docs/archive.md` | `tests/test_archive.py` |
+
 ## Pipeline
 
 `scan` (read-only index) → `report` → `plan` (dest paths only) → `apply`
@@ -203,6 +221,9 @@ do not call the real Recycle Bin.
 `lam actions run PLAN.json` is a **separate** JSON file-action runner
 (`file-action-plan/v1`). Dry-run default; `--apply` executes. See README.
 
+`lam pack` and `lam unpack` are a **separate** zip/tar.gz pair. Dry-run
+default; `--apply` writes. See `docs/archive.md`.
+
 ## Config
 
 Default file: `library.jsonc` in cwd. Must not sit inside a source or the
@@ -210,7 +231,7 @@ destination tree (`lam.config.validate_config`). Setup UI can write it.
 
 ## Court queue
 
-Court file chores go through gpu-queue as work type `lam`. The court calls this repo's existing CLI (`python -m lam`) with an allowlisted argv: `capabilities`, `scan`, `report`, `plan`, `apply`, `tag scan`, and `tag plan`. This repo's code is unchanged. The queue does not call `lam patreon`, `lam token`, `lam serve`, `lam actions`, `lam oversize`, or `lam undo`, and it does not pass a delete.
+Court file chores go through gpu-queue as work type `lam`. The court calls this repo's existing CLI (`python -m lam`) with an allowlisted argv: `capabilities`, `scan`, `report`, `plan`, `apply`, `tag scan`, and `tag plan`. This repo's code is unchanged. The queue does not call `lam patreon`, `lam token`, `lam serve`, `lam actions`, `lam oversize`, `lam pack`, `lam unpack`, or `lam undo`, and it does not pass a delete.
 
 ## Git
 

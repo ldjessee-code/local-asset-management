@@ -137,6 +137,28 @@ COMMANDS: tuple[dict[str, Any], ...] = (
         ),
         "function": "lam.oversize.cli.run_oversize_command",
     },
+    {
+        "name": "pack",
+        "config_required": False,
+        "writes": True,
+        "summary": (
+            "Pack a folder into a new zip or tar.gz (lam pack). Dry-run default. "
+            "--apply writes a sibling temp, adds manifest.tsv, verifies SHA-256, "
+            "then renames. Never overwrites."
+        ),
+        "function": "lam.archive.run_pack",
+    },
+    {
+        "name": "unpack",
+        "config_required": False,
+        "writes": True,
+        "summary": (
+            "Unpack a zip or tar.gz (lam unpack). Dry-run default. "
+            "Rejects zip-slip and tar symlinks before writing. Never overwrites. "
+            "--on-conflict skip (default) or backup."
+        ),
+        "function": "lam.archive.run_unpack",
+    },
 )
 
 MODULES: tuple[dict[str, str], ...] = (
@@ -168,6 +190,10 @@ MODULES: tuple[dict[str, str], ...] = (
     {
         "module": "lam.oversize",
         "role": "Oversize image proxies and one central register (lam oversize)",
+    },
+    {
+        "module": "lam.archive",
+        "role": "Pack and unpack zip/tar.gz (dry-run default, manifest.tsv, never overwrite)",
     },
 )
 
@@ -304,6 +330,18 @@ def describe_capabilities() -> dict[str, Any]:
             "needs_apply_flag": True,
             "optional_extra": "images",
         },
+        "archive": {
+            "command": "lam pack / lam unpack",
+            "docs": "docs/archive.md",
+            "pack": "lam pack SRC_DIR ARCHIVE",
+            "unpack": "lam unpack ARCHIVE TARGET_DIR",
+            "formats": ["zip", "tar.gz"],
+            "not_yet": ["7z", "rar"],
+            "dry_run_default": True,
+            "needs_apply_flag": True,
+            "never_overwrite": True,
+            "manifest": "manifest.tsv",
+        },
         "modules": [dict(m) for m in MODULES],
         "http": [dict(h) for h in HTTP_API],
         "public_python": list(PUBLIC_PYTHON),
@@ -389,6 +427,12 @@ def format_capabilities_text(data: dict[str, Any] | None = None) -> str:
         "  deprecated: "
         + (", ".join(oversize_ids["deprecated"]) if oversize_ids["deprecated"] else "(none)")
     )
+    archive = cap.get("archive")
+    if archive:
+        lines += ["", "Archive:"]
+        lines.append("  " + archive["pack"])
+        lines.append("  " + archive["unpack"])
+        lines.append("  formats: " + ", ".join(archive["formats"]))
     lines += ["", "Not in v0.1:"]
     for item in cap["safety"]["not_in_v1"]:
         lines.append(f"  - {item}")

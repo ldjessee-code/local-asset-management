@@ -3,7 +3,8 @@
 
 ``scan`` / ``report`` / ``plan`` / ``apply`` need a config (default:
 ``library.jsonc`` in the current directory). ``serve``, ``capabilities``,
-``actions``, ``token``, ``patreon``, ``tag``, and ``oversize`` do not.
+``actions``, ``token``, ``patreon``, ``tag``, ``oversize``, ``pack``, and
+``unpack`` do not.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from pathlib import Path
 
 from lam.version import __version__
 from lam.actions import PlanError, run_file_actions, undo_file_actions
+from lam.archive import add_archive_parsers, run_archive_command
 from lam.apply import run_apply
 from lam.capabilities import describe_capabilities, format_capabilities_text
 from lam.config import ConfigError, find_default_config, load_config
@@ -29,7 +31,17 @@ from lam.patreon.cli import add_patreon_parser, run_patreon_command
 from lam.tag.cli import add_tag_parser, run_tag_command
 from lam.token.cli import add_token_parser, run_token_command
 
-NO_CONFIG_CMDS = frozenset({"serve", "capabilities", "actions", "token", "patreon", "tag", "oversize"})
+NO_CONFIG_CMDS = frozenset({
+    "serve",
+    "capabilities",
+    "actions",
+    "token",
+    "patreon",
+    "tag",
+    "oversize",
+    "pack",
+    "unpack",
+})
 
 SOURCE_URL = "https://github.com/ldjessee-code/local-asset-management"
 NO_CONFIG_HINT = (
@@ -109,6 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_patreon_parser(sub)
     add_tag_parser(sub)
     add_oversize_parser(sub)
+    add_archive_parsers(sub)
     return p
 
 
@@ -165,6 +178,8 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(run_tag_command(args))
     if args.cmd == "oversize":
         raise SystemExit(run_oversize_command(args))
+    if args.cmd in {"pack", "unpack"}:
+        raise SystemExit(run_archive_command(args))
     try:
         cfg_path = resolve_config_path(args.config, required=(args.cmd not in NO_CONFIG_CMDS))
         cfg = load_config(cfg_path) if cfg_path else None
