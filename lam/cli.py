@@ -163,7 +163,19 @@ def _actions_command(args: argparse.Namespace) -> int:
     return 2
 
 
+def _utf8_console() -> None:
+    """Make stdout/stderr UTF-8 with errors='replace' so odd filenames cannot crash output."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def main(argv: list[str] | None = None) -> None:
+    _utf8_console()
     args = build_parser().parse_args(argv)
     if args.cmd == "actions":
         raise SystemExit(_actions_command(args))

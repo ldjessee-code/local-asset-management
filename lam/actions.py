@@ -882,6 +882,23 @@ def _load_plan_file(plan_path: Path) -> dict:
     return data
 
 
+def _safe_printer(printer: PrintFn) -> PrintFn:
+    """Wrap *printer* so a console that cannot encode a filename never aborts a run."""
+
+    def _log(line: str) -> None:
+        try:
+            printer(line)
+        except UnicodeError:
+            try:
+                printer(line.encode("ascii", "backslashreplace").decode("ascii"))
+            except Exception:  # noqa: BLE001
+                pass
+        except OSError:
+            pass
+
+    return _log
+
+
 def run_file_actions(
     plan_path: Path,
     *,
@@ -907,7 +924,7 @@ def run_file_actions(
     started = local_iso_now()
     out_path = _choose_results_path(plan_path, results_path)
     rec = recycle_fn or recycle_path
-    log = printer or print
+    log = _safe_printer(printer or print)
     if schema_warning:
         log(f"warning: {schema_warning}")
     state = SimState()
@@ -961,7 +978,6 @@ def run_file_actions(
             if outcome.ok:
                 item = _item_dict(index, prep, "ok", outcome.reason)
                 items.append(item)
-                _print_item(item, log)
                 if undo_writer is not None and undo_fh is not None and not prep.already_present:
                     _append_undo(
                         undo_writer,
@@ -972,6 +988,7 @@ def run_file_actions(
                         prep.size,
                         prep.sha256,
                     )
+                _print_item(item, log)
                 _apply_sim(state, prep)
             else:
                 item = _item_dict(index, prep, "failed", outcome.reason)
@@ -1018,6 +1035,24 @@ def run_file_actions(
     finally:
         if undo_fh is not None:
             undo_fh.close()
+        if not completed:
+            # Never lose the record of what already happened (kb-55, 2026-10-15).
+            try:
+                _write_results(
+                    out_path,
+                    _results_body(
+                        plan=str(plan_path),
+                        mode=mode,
+                        started=started,
+                        finished=local_iso_now(),
+                        summary=_summarize(items),
+                        items=items,
+                        plan_schema=plan_schema,
+                        warnings=warnings + ["run aborted before completion; results are partial"],
+                    ),
+                )
+            except Exception:  # noqa: BLE001 - best effort, original error propagates
+                pass
         counts = _summarize(items)
         failed = counts["failed"] + counts["would_fail"]
         if not completed:
