@@ -57,10 +57,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"lam {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("scan", help="Walk sources, hash collisions, index zips")
-    sub.add_parser("report", help="Write reports/summary.md and exceptions.md")
-    sub.add_parser("plan", help="Build copy/quarantine plan from the last scan")
-    ap = sub.add_parser("apply", help="Execute the last plan (never deletes in v0.1)")
+    def _pipe(name: str, help_text: str):
+        sp = sub.add_parser(name, help=help_text)
+        # Same flag as the parent parser so queue argv ["scan", "--config", path] works.
+        sp.add_argument(
+            "--config",
+            default=None,
+            help="Config file. Default: library.jsonc in cwd, or LAM_CONFIG.",
+        )
+        return sp
+
+    _pipe("scan", "Walk sources, hash collisions, index zips")
+    _pipe("report", "Write reports/summary.md and exceptions.md")
+    _pipe("plan", "Build copy/quarantine plan from the last scan")
+    ap = _pipe("apply", "Execute the last plan (never deletes in v0.1)")
     ap.add_argument("--yes", action="store_true", help="Required to actually copy")
 
     serve = sub.add_parser("serve", help="Open the local / LAN web UI (setup works with no config file)")
