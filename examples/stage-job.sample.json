@@ -1,0 +1,16 @@
+{
+  "schema": "lam-stage-job/v1",
+  "owner": "notLib",
+  "job": "sample",
+  "target": "C:\\Example\\library\\books",
+  "plan": null,
+  "status": "new",
+  "created": "2026-10-16T12:00:00-04:00",
+  "kind": "generic",
+  "placed": null,
+  "stale": false,
+  "cleaned": null,
+  "byte_cap": null,
+  "job_dir": "C:\\Example\\staging\\notLib\\sample",
+  "staging_root": "C:\\Example\\staging"
+}

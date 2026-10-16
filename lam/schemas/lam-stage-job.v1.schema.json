@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/lam-stage-job.v1.schema.json",
+  "title": "lam-stage-job/v1",
+  "description": "One court staging job. Files are processed outside Dropbox, then lam place copies them.",
+  "type": "object",
+  "required": ["schema", "owner", "job", "target", "plan", "status", "created", "kind"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "lam-stage-job/v1" },
+    "owner": { "type": "string", "minLength": 1 },
+    "job": { "type": "string", "minLength": 1 },
+    "target": { "type": "string", "minLength": 1 },
+    "plan": { "type": ["string", "null"] },
+    "status": { "enum": ["new", "placed", "failed", "unplaced"] },
+    "created": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["generic", "game-book", "fiction", "review", "image", "map"] },
+    "placed": { "type": ["string", "null"] },
+    "stale": { "type": "boolean" },
+    "cleaned": { "type": ["string", "null"] },
+    "byte_cap": { "type": ["integer", "null"], "minimum": 1 },
+    "job_dir": { "type": "string", "minLength": 1 },
+    "staging_root": { "type": "string", "minLength": 1 }
+  }
+}

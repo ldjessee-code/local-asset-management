@@ -28,6 +28,8 @@ SUBBINS_SCHEMA_ID = "lam-subbins/v1"
 TAG_SIDECAR_SCHEMA_ID = "lam-tag-sidecar/v1"
 TAG_REVIEW_SCHEMA_ID = "lam-tag-review/v1"
 OVERSIZE_REGISTER_SCHEMA_ID = "lam-oversize-register/v1"
+STAGE_JOB_SCHEMA_ID = "lam-stage-job/v1"
+PLACE_MANIFEST_SCHEMA_ID = "lam-place-manifest/v1"
 
 STATUS_SUPPORTED = "supported"
 STATUS_DEPRECATED = "deprecated"
@@ -162,6 +164,24 @@ OVERSIZE_SCHEMAS: dict[str, SchemaEntry] = {
     ),
 }
 
+STAGE_JOB_SCHEMAS: dict[str, SchemaEntry] = {
+    STAGE_JOB_SCHEMA_ID: SchemaEntry(
+        schema_id=STAGE_JOB_SCHEMA_ID,
+        kind="stage-job",
+        status=STATUS_SUPPORTED,
+        filename="lam-stage-job.v1.schema.json",
+    ),
+}
+
+PLACE_MANIFEST_SCHEMAS: dict[str, SchemaEntry] = {
+    PLACE_MANIFEST_SCHEMA_ID: SchemaEntry(
+        schema_id=PLACE_MANIFEST_SCHEMA_ID,
+        kind="place-manifest",
+        status=STATUS_SUPPORTED,
+        filename="lam-place-manifest.v1.schema.json",
+    ),
+}
+
 KIND_LABELS = {
     "plan": "plan",
     "results": "results",
@@ -175,6 +195,8 @@ KIND_LABELS = {
     "tag-sidecar": "tag-sidecar",
     "tag-review": "tag-review",
     "oversize-register": "oversize-register",
+    "stage-job": "stage-job",
+    "place-manifest": "place-manifest",
 }
 
 

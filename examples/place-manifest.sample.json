@@ -1,0 +1,16 @@
+{
+  "schema": "lam-place-manifest/v1",
+  "job": "sample",
+  "target": "C:\\Example\\library\\books",
+  "created": "2026-10-16T12:00:00-04:00",
+  "entries": [
+    {
+      "src": "C:\\Example\\staging\\notLib\\sample\\out\\note.txt",
+      "dest": "C:\\Example\\library\\books\\note.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0,
+      "role": "file",
+      "original": null
+    }
+  ]
+}

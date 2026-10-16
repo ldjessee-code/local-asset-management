@@ -3,7 +3,8 @@
 
 ``scan`` / ``report`` / ``plan`` / ``apply`` need a config (default:
 ``library.jsonc`` in the current directory). ``serve``, ``capabilities``,
-``actions``, ``token``, ``patreon``, ``tag``, and ``oversize`` do not.
+``actions``, ``token``, ``patreon``, ``tag``, ``oversize``, ``stage``,
+``place``, ``publish``, ``pack``, and ``unpack`` do not.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from pathlib import Path
 
 from lam.version import __version__
 from lam.actions import PlanError, run_file_actions, undo_file_actions
+from lam.archive import add_archive_parsers, run_archive_command
 from lam.apply import run_apply
 from lam.capabilities import describe_capabilities, format_capabilities_text
 from lam.config import ConfigError, find_default_config, load_config
@@ -26,10 +28,31 @@ from lam.report import write_reports
 from lam.scan import run_scan
 from lam.oversize.cli import add_oversize_parser, run_oversize_command
 from lam.patreon.cli import add_patreon_parser, run_patreon_command
+from lam.stage.cli import (
+    add_place_parser,
+    add_publish_parser,
+    add_stage_parser,
+    run_place_command,
+    run_publish_command,
+    run_stage_command,
+)
 from lam.tag.cli import add_tag_parser, run_tag_command
 from lam.token.cli import add_token_parser, run_token_command
 
-NO_CONFIG_CMDS = frozenset({"serve", "capabilities", "actions", "token", "patreon", "tag", "oversize"})
+NO_CONFIG_CMDS = frozenset({
+    "serve",
+    "capabilities",
+    "actions",
+    "token",
+    "patreon",
+    "tag",
+    "oversize",
+    "stage",
+    "place",
+    "publish",
+    "pack",
+    "unpack",
+})
 
 SOURCE_URL = "https://github.com/ldjessee-code/local-asset-management"
 NO_CONFIG_HINT = (
@@ -57,10 +80,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"lam {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("scan", help="Walk sources, hash collisions, index zips")
-    sub.add_parser("report", help="Write reports/summary.md and exceptions.md")
-    sub.add_parser("plan", help="Build copy/quarantine plan from the last scan")
-    ap = sub.add_parser("apply", help="Execute the last plan (never deletes in v0.1)")
+    def _pipe(name: str, help_text: str):
+        sp = sub.add_parser(name, help=help_text)
+        # Same flag as the parent parser so queue argv ["scan", "--config", path] works.
+        sp.add_argument(
+            "--config",
+            default=None,
+            help="Config file. Default: library.jsonc in cwd, or LAM_CONFIG.",
+        )
+        return sp
+
+    _pipe("scan", "Walk sources, hash collisions, index zips")
+    _pipe("report", "Write reports/summary.md and exceptions.md")
+    _pipe("plan", "Build copy/quarantine plan from the last scan")
+    ap = _pipe("apply", "Execute the last plan (never deletes in v0.1)")
     ap.add_argument("--yes", action="store_true", help="Required to actually copy")
 
     serve = sub.add_parser("serve", help="Open the local / LAN web UI (setup works with no config file)")
@@ -109,6 +142,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_patreon_parser(sub)
     add_tag_parser(sub)
     add_oversize_parser(sub)
+    add_stage_parser(sub)
+    add_place_parser(sub)
+    add_publish_parser(sub)
+    add_archive_parsers(sub)
     return p
 
 
@@ -153,7 +190,19 @@ def _actions_command(args: argparse.Namespace) -> int:
     return 2
 
 
+def _utf8_console() -> None:
+    """Make stdout/stderr UTF-8 with errors='replace' so odd filenames cannot crash output."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def main(argv: list[str] | None = None) -> None:
+    _utf8_console()
     args = build_parser().parse_args(argv)
     if args.cmd == "actions":
         raise SystemExit(_actions_command(args))
@@ -165,6 +214,14 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(run_tag_command(args))
     if args.cmd == "oversize":
         raise SystemExit(run_oversize_command(args))
+    if args.cmd == "stage":
+        raise SystemExit(run_stage_command(args))
+    if args.cmd == "place":
+        raise SystemExit(run_place_command(args))
+    if args.cmd == "publish":
+        raise SystemExit(run_publish_command(args))
+    if args.cmd in {"pack", "unpack"}:
+        raise SystemExit(run_archive_command(args))
     try:
         cfg_path = resolve_config_path(args.config, required=(args.cmd not in NO_CONFIG_CMDS))
         cfg = load_config(cfg_path) if cfg_path else None
