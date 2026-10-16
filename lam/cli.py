@@ -4,7 +4,7 @@
 ``scan`` / ``report`` / ``plan`` / ``apply`` need a config (default:
 ``library.jsonc`` in the current directory). ``serve``, ``capabilities``,
 ``actions``, ``token``, ``patreon``, ``tag``, ``oversize``, ``stage``,
-``place``, and ``publish`` do not.
+``place``, ``publish``, ``pack``, and ``unpack`` do not.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from pathlib import Path
 
 from lam.version import __version__
 from lam.actions import PlanError, run_file_actions, undo_file_actions
+from lam.archive import add_archive_parsers, run_archive_command
 from lam.apply import run_apply
 from lam.capabilities import describe_capabilities, format_capabilities_text
 from lam.config import ConfigError, find_default_config, load_config
@@ -49,6 +50,8 @@ NO_CONFIG_CMDS = frozenset({
     "stage",
     "place",
     "publish",
+    "pack",
+    "unpack",
 })
 
 SOURCE_URL = "https://github.com/ldjessee-code/local-asset-management"
@@ -142,6 +145,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_stage_parser(sub)
     add_place_parser(sub)
     add_publish_parser(sub)
+    add_archive_parsers(sub)
     return p
 
 
@@ -216,6 +220,8 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(run_place_command(args))
     if args.cmd == "publish":
         raise SystemExit(run_publish_command(args))
+    if args.cmd in {"pack", "unpack"}:
+        raise SystemExit(run_archive_command(args))
     try:
         cfg_path = resolve_config_path(args.config, required=(args.cmd not in NO_CONFIG_CMDS))
         cfg = load_config(cfg_path) if cfg_path else None

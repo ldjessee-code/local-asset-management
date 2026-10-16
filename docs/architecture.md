@@ -41,6 +41,10 @@ scan → report → plan → apply. A job lives outside Dropbox
 records them in `lam-place-manifest/v1`. Kind `map` uses a 100000000 byte
 cap. See [staging.md](staging.md).
 
+`lam pack` and `lam unpack` (`lam.archive`) build or extract a zip or
+tar.gz. Dry-run is the default. `--apply` never overwrites and never
+deletes. See [archive.md](archive.md).
+
 The browser talks JSON to FastAPI. Jobs run in a background thread on the
 machine that can see the disks.
 
@@ -67,6 +71,7 @@ machine that can see the disks.
 | `lam.tag` | `lam tag scan` / `lam tag plan` layered sorter (writes a plan; does not move files) |
 | `lam.oversize` | `lam oversize scan` / `lam oversize list` proxies and one register |
 | `lam.stage` | `lam stage`, `lam place`, `lam publish` (copy into Dropbox; not part of the pipeline) |
+| `lam.archive` | `lam pack` / `lam unpack` zip and tar.gz (dry-run, manifest, never overwrite) |
 
 Public imports are listed in `lam/__init__.py`. Prefer those over private
 helpers (`_log_jsonl`, SQL strings, …).

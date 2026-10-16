@@ -171,6 +171,28 @@ COMMANDS: tuple[dict[str, Any], ...] = (
         ),
         "function": "lam.stage.cli.run_publish_command",
     },
+    {
+        "name": "pack",
+        "config_required": False,
+        "writes": True,
+        "summary": (
+            "Pack a folder into a new zip or tar.gz (lam pack). Dry-run default. "
+            "--apply writes a sibling temp, adds manifest.tsv, verifies SHA-256, "
+            "then renames. Never overwrites."
+        ),
+        "function": "lam.archive.run_pack",
+    },
+    {
+        "name": "unpack",
+        "config_required": False,
+        "writes": True,
+        "summary": (
+            "Unpack a zip or tar.gz (lam unpack). Dry-run default. "
+            "Rejects zip-slip and tar symlinks before writing. Never overwrites. "
+            "--on-conflict skip (default) or backup."
+        ),
+        "function": "lam.archive.run_unpack",
+    },
 )
 
 MODULES: tuple[dict[str, str], ...] = (
@@ -206,6 +228,10 @@ MODULES: tuple[dict[str, str], ...] = (
     {
         "module": "lam.stage",
         "role": "Court staging, verified place/publish copy, and staged-byte cleanup",
+    },
+    {
+        "module": "lam.archive",
+        "role": "Pack and unpack zip/tar.gz (dry-run default, manifest.tsv, never overwrite)",
     },
 )
 
@@ -357,6 +383,18 @@ def describe_capabilities() -> dict[str, Any]:
             "clean_dry_run_default": True,
             "copy_not_move": True,
         },
+        "archive": {
+            "command": "lam pack / lam unpack",
+            "docs": "docs/archive.md",
+            "pack": "lam pack SRC_DIR ARCHIVE",
+            "unpack": "lam unpack ARCHIVE TARGET_DIR",
+            "formats": ["zip", "tar.gz"],
+            "not_yet": ["7z", "rar"],
+            "dry_run_default": True,
+            "needs_apply_flag": True,
+            "never_overwrite": True,
+            "manifest": "manifest.tsv",
+        },
         "modules": [dict(m) for m in MODULES],
         "http": [dict(h) for h in HTTP_API],
         "public_python": list(PUBLIC_PYTHON),
@@ -448,6 +486,12 @@ def format_capabilities_text(data: dict[str, Any] | None = None) -> str:
     lines.append("  manifest supported: " + ", ".join(staging["manifest_schema_ids"]["supported"]))
     lines.append(f"  {STAGE_JOB_SCHEMA_ID}")
     lines.append(f"  {PLACE_MANIFEST_SCHEMA_ID}")
+    archive = cap.get("archive")
+    if archive:
+        lines += ["", "Archive:"]
+        lines.append("  " + archive["pack"])
+        lines.append("  " + archive["unpack"])
+        lines.append("  formats: " + ", ".join(archive["formats"]))
     lines += ["", "Not in v0.1:"]
     for item in cap["safety"]["not_in_v1"]:
         lines.append(f"  - {item}")
