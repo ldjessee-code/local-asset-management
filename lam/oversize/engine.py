@@ -394,6 +394,11 @@ def _write_zip(src: Path, dest: Path, expected_sha: str) -> None:
         raise
 
 
+def write_verified_zip(src: Path, dest: Path, expected_sha: str) -> None:
+    """ZIP_STORED one member, verify, then publish dest. Does not delete src."""
+    _write_zip(src, dest, expected_sha)
+
+
 def verify_zip(zip_path: Path, original: Path, expected_sha: str) -> None:
     """Reopen the zip, run ``testzip()``, and stream the member's SHA-256."""
     with zipfile.ZipFile(zip_path, "r") as handle:

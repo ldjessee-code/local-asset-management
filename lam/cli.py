@@ -3,7 +3,8 @@
 
 ``scan`` / ``report`` / ``plan`` / ``apply`` need a config (default:
 ``library.jsonc`` in the current directory). ``serve``, ``capabilities``,
-``actions``, ``token``, ``patreon``, ``tag``, and ``oversize`` do not.
+``actions``, ``token``, ``patreon``, ``tag``, ``oversize``, ``stage``,
+``place``, and ``publish`` do not.
 """
 
 from __future__ import annotations
@@ -26,10 +27,29 @@ from lam.report import write_reports
 from lam.scan import run_scan
 from lam.oversize.cli import add_oversize_parser, run_oversize_command
 from lam.patreon.cli import add_patreon_parser, run_patreon_command
+from lam.stage.cli import (
+    add_place_parser,
+    add_publish_parser,
+    add_stage_parser,
+    run_place_command,
+    run_publish_command,
+    run_stage_command,
+)
 from lam.tag.cli import add_tag_parser, run_tag_command
 from lam.token.cli import add_token_parser, run_token_command
 
-NO_CONFIG_CMDS = frozenset({"serve", "capabilities", "actions", "token", "patreon", "tag", "oversize"})
+NO_CONFIG_CMDS = frozenset({
+    "serve",
+    "capabilities",
+    "actions",
+    "token",
+    "patreon",
+    "tag",
+    "oversize",
+    "stage",
+    "place",
+    "publish",
+})
 
 SOURCE_URL = "https://github.com/ldjessee-code/local-asset-management"
 NO_CONFIG_HINT = (
@@ -119,6 +139,9 @@ def build_parser() -> argparse.ArgumentParser:
     add_patreon_parser(sub)
     add_tag_parser(sub)
     add_oversize_parser(sub)
+    add_stage_parser(sub)
+    add_place_parser(sub)
+    add_publish_parser(sub)
     return p
 
 
@@ -187,6 +210,12 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(run_tag_command(args))
     if args.cmd == "oversize":
         raise SystemExit(run_oversize_command(args))
+    if args.cmd == "stage":
+        raise SystemExit(run_stage_command(args))
+    if args.cmd == "place":
+        raise SystemExit(run_place_command(args))
+    if args.cmd == "publish":
+        raise SystemExit(run_publish_command(args))
     try:
         cfg_path = resolve_config_path(args.config, required=(args.cmd not in NO_CONFIG_CMDS))
         cfg = load_config(cfg_path) if cfg_path else None

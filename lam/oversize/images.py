@@ -7,9 +7,14 @@ import os
 import uuid
 from pathlib import Path
 
-from lam.oversize.errors import MissingPyvips
+from lam.oversize.errors import MissingPyvips, OversizeError
 
 IMAGE_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"})
+
+# Long-side attempts, largest first. ``max_dim`` is tried even when it is not in this list.
+_STANDIN_EDGES = (8000, 4000, 2000, 1600, 1200, 800, 400, 200, 100, 64, 32)
+# JPEG quality attempts. Never try a step above the caller's ``quality``.
+_STANDIN_QUALITIES = (90, 70, 50, 30, 15, 5)
 
 
 def load_pyvips():
@@ -79,3 +84,64 @@ def write_proxy(src: Path, dest: Path, *, max_dim: int, quality: int) -> tuple[i
     finally:
         del image
     return width, height
+
+
+def _standin_edges(max_dim: int) -> list[int]:
+    """``max_dim`` first, then the fixed edges that are strictly smaller."""
+    limit = int(max_dim)
+    edges = [limit]
+    for edge in _STANDIN_EDGES:
+        if edge < limit:
+            edges.append(edge)
+    return edges
+
+
+def _standin_qualities(src: Path, quality: int) -> list[int]:
+    """PNG ignores quality. JPEG proxies (including WebP and TIFF) may drop Q."""
+    limit = int(quality)
+    if proxy_extension(src) == ".png":
+        return [limit]
+    steps = [step for step in _STANDIN_QUALITIES if step <= limit]
+    return steps or [limit]
+
+
+def write_standin_under_bytes(
+    src: Path,
+    dest: Path,
+    *,
+    max_bytes: int,
+    max_dim: int = 8000,
+    quality: int = 90,
+) -> tuple[int, int]:
+    """Write a proxy at or under ``max_bytes``. Never removes or recycles *src*.
+
+    Each attempt goes through :func:`write_proxy` to a scratch file. ``write_proxy``
+    picks JPEG or PNG from the destination suffix, so the scratch keeps *dest*'s
+    suffix. A scratch that is still over the cap is deleted. A scratch that fits
+    is published with ``os.replace`` only while *dest* is absent.
+    """
+    if max_bytes < 1:
+        raise OversizeError("max_bytes must be at least 1")
+    src = Path(src)
+    dest = Path(dest)
+    if dest.exists():
+        raise FileExistsError(f"refusing to replace existing stand-in: {dest}")
+
+    for edge in _standin_edges(max_dim):
+        for attempt_quality in _standin_qualities(src, quality):
+            # Suffix matches *dest* so write_proxy does not JPEG-save a PNG.
+            scratch = dest.with_name(f".{dest.name}.{uuid.uuid4().hex}.try{dest.suffix}")
+            published = False
+            try:
+                width, height = write_proxy(src, scratch, max_dim=edge, quality=attempt_quality)
+                if scratch.stat().st_size > max_bytes:
+                    continue
+                if dest.exists():
+                    raise FileExistsError(f"refusing to replace existing stand-in: {dest}")
+                os.replace(scratch, dest)
+                published = True
+                return width, height
+            finally:
+                if not published:
+                    _unlink_temp(scratch)
+    raise OversizeError(f"stand-in exceeds max_bytes ({max_bytes})", code=1)

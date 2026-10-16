@@ -68,6 +68,15 @@ Skipped: directories named `.git`, directories named `_Originals_Zipped`
 stem already ends with the proxy suffix, and any path the register already
 lists as a proxy.
 
+## Stand-in byte cap
+
+`write_standin_under_bytes` (in `lam/oversize/images.py`) writes a proxy
+whose file size is at or under a caller-supplied byte cap. `lam place`
+uses it for job kind `map` with a default cap of 100000000 decimal bytes.
+`write_verified_zip` publishes a stored zip only after `verify_zip`.
+Neither function changes `lam oversize scan`: scan is still bytes OR
+pixels, and `--apply` proxies are still an 8000 px long side.
+
 ## The set
 
 `--set-depth N` (default 1) picks the set folder: the ancestor N levels

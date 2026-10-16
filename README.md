@@ -243,6 +243,36 @@ lam oversize scan D:\maps --apply
 lam oversize list --csv oversize.csv
 ```
 
+### Court staging (`lam stage`, `lam place`, `lam publish`)
+
+Downloads are finished outside Dropbox. `lam stage new` creates
+`<root>\<owner>\<job>_timestamp\{in,work,out,logs}` and a `lam-stage-job/v1`
+file. The root defaults to `C:\CourtStaging` when that drive exists, else
+`F:\CourtStaging`, and is refused inside Dropbox or OneDrive.
+
+`lam place <jobdir>` copies `out\` into the job target. It writes
+`<dest>.~place.tmp`, renames with a lock retry, and checks the SHA-256.
+Same hash skips. A different hash stops unless you pass
+`--on-conflict=suffix` or `--replace` (Recycle Bin, never a hard delete).
+`--dry-run` writes nothing. Kind `map` caps a file at 100000000 bytes: the
+stand-in is copied at the original path and the original is zipped under
+`<target>\_Originals_Zipped`. `lam publish <file> <dest>` is the same copy
+for one live file (undo CSV `<dest>.publish-undo.csv`).
+
+`lam stage clean` is a dry run until `--apply`. A placed job keeps its
+payload 14 days, then those folders go to the Recycle Bin. Failed and
+unplaced jobs are kept and flagged stale after 30 days.
+
+Details: [docs/staging.md](docs/staging.md).
+
+```text
+lam stage new --owner notLib --job maps --target D:\Dropbox\Gaming\Maps --kind map
+lam place C:\CourtStaging\notLib\maps_20261016_1200 --dry-run
+lam place C:\CourtStaging\notLib\maps_20261016_1200 --jobs-dir D:\jobs\maps
+lam publish tracker.csv D:\Dropbox\TheCourt\tracker.csv
+lam stage clean --apply
+```
+
 ## Web UI
 
 The engine process serves the UI. Open it from a laptop or a phone on

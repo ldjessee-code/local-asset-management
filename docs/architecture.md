@@ -35,6 +35,12 @@ page, writes one central register (`lam-oversize-register/v1`), and on
 `--apply` builds a proxy. A verified zip is the only path to the Recycle
 Bin. See [oversize.md](oversize.md).
 
+`lam stage`, `lam place`, and `lam publish` (`lam.stage`) are not part of
+scan → report → plan → apply. A job lives outside Dropbox
+(`lam-stage-job/v1`). `lam place` copies finished files into the target and
+records them in `lam-place-manifest/v1`. Kind `map` uses a 100000000 byte
+cap. See [staging.md](staging.md).
+
 The browser talks JSON to FastAPI. Jobs run in a background thread on the
 machine that can see the disks.
 
@@ -50,7 +56,7 @@ machine that can see the disks.
 | `lam.layouts` | named dest templates |
 | `lam.plan` / `lam.apply` | destinations, then copy |
 | `lam.actions` | JSON file-action runner (dry-run / `--apply` / undo) |
-| `lam.schemas.registry` | Plan, results, site-profiles, patreon, tag, and oversize schema ids (`supported` / `deprecated` / `removed`) |
+| `lam.schemas.registry` | Plan, results, site-profiles, patreon, tag, oversize, and staging schema ids (`supported` / `deprecated` / `removed`) |
 | `lam.schema_lite` | stdlib JSON Schema subset for those plans |
 | `lam.report` | markdown + JSON |
 | `lam.web.app` | FastAPI |
@@ -60,6 +66,7 @@ machine that can see the disks.
 | `lam.patreon` | `lam patreon list`, `sync`, `validate-config` (inbox + manifest only) |
 | `lam.tag` | `lam tag scan` / `lam tag plan` layered sorter (writes a plan; does not move files) |
 | `lam.oversize` | `lam oversize scan` / `lam oversize list` proxies and one register |
+| `lam.stage` | `lam stage`, `lam place`, `lam publish` (copy into Dropbox; not part of the pipeline) |
 
 Public imports are listed in `lam/__init__.py`. Prefer those over private
 helpers (`_log_jsonl`, SQL strings, …).
