@@ -49,7 +49,7 @@ def add_stage_parser(subparsers) -> None:
     stage.add_argument("--kind", choices=KINDS, default=None, help="stage new: naming pattern. map uses a 100000000 byte cap")
     stage.add_argument("--byte-cap", type=int, default=None, help="stage new: override the file-size cap in bytes")
     stage.add_argument("--apply", action="store_true", help="stage clean: recycle expired payload and flag stale jobs")
-    stage.add_argument("--json", action="store_true", help="stage FILE: print a lam-place/v1 document")
+    stage.add_argument("--json", action="store_true", help="stage FILE: print a place/v1 document")
 
 
 def add_place_parser(subparsers) -> None:
@@ -64,7 +64,7 @@ def add_place_parser(subparsers) -> None:
     place.add_argument("--backup-dir", default=None, help="Single-file: directory for the kept backup")
     place.add_argument("--root", default=None, help="Single-file: staged file must sit under this root")
     place.add_argument("--grant", default=None, help="Single-file: dest must sit under this prefix")
-    place.add_argument("--json", action="store_true", help="Single-file: print a lam-place/v1 document")
+    place.add_argument("--json", action="store_true", help="Single-file: print a place/v1 document")
     place.add_argument("--strict", action="store_true", help="Job place: block when a file name warns")
     place.add_argument("--jobs-dir", default=None, help="Job place: copy small text logs here")
     place.add_argument("--kind", choices=KINDS, default=None, help="Job place: override job.json kind for this run")

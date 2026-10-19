@@ -30,7 +30,7 @@ TAG_REVIEW_SCHEMA_ID = "lam-tag-review/v1"
 OVERSIZE_REGISTER_SCHEMA_ID = "lam-oversize-register/v1"
 STAGE_JOB_SCHEMA_ID = "lam-stage-job/v1"
 PLACE_MANIFEST_SCHEMA_ID = "lam-place-manifest/v1"
-PLACE_RESULT_SCHEMA_ID = "lam-place/v1"
+PLACE_RESULT_SCHEMA_ID = "place/v1"
 
 STATUS_SUPPORTED = "supported"
 STATUS_DEPRECATED = "deprecated"
@@ -188,7 +188,7 @@ PLACE_RESULT_SCHEMAS: dict[str, SchemaEntry] = {
         schema_id=PLACE_RESULT_SCHEMA_ID,
         kind="place-result",
         status=STATUS_SUPPORTED,
-        filename="lam-place.v1.schema.json",
+        filename="place.v1.schema.json",
     ),
 }
 

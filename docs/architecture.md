@@ -39,7 +39,7 @@ Bin. See [oversize.md](oversize.md).
 scan, report, plan, and apply. A job lives outside Dropbox
 (`lam-stage-job/v1`). `lam place` copies finished files into the target and
 records them in `lam-place-manifest/v1`. Single-file `lam stage FILE` and
-`lam place STAGED DEST` print `lam-place/v1` and recycle the old file only
+`lam place STAGED DEST` print `place/v1` (`tool` is `lam`) and recycle the old file only
 after the new sha verifies. Kind `map` uses a 100000000 byte
 cap. See [staging.md](staging.md).
 

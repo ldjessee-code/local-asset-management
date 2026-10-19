@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ldjessee-code/local-asset-management/schemas/place.v1.schema.json",
+  "title": "place/v1",
+  "description": "Shared result of single-file stage or place for lam and soay. tool is lam or soay. sha256 is null on refused, conflict, and sha-mismatch; the staged file sha on dry-run and staged; the final dest sha on placed. old_sha256 is the dest hash on sha-mismatch and on a replace dry-run. size is the staged or placed file size, and null when the staged file is missing or the hex is bad. trash_path may be null (always null for lam). Exit 1 does not promise dest is unchanged; callers re-hash dest.",
+  "type": "object",
+  "required": [
+    "schema",
+    "tool",
+    "status",
+    "dest",
+    "staged",
+    "sha256",
+    "old_sha256",
+    "backup_path",
+    "trash_path",
+    "size",
+    "message"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "place/v1" },
+    "tool": { "enum": ["lam", "soay"] },
+    "status": {
+      "enum": [
+        "placed",
+        "dry-run",
+        "staged",
+        "conflict",
+        "sha-mismatch",
+        "refused",
+        "failed"
+      ]
+    },
+    "dest": { "type": ["string", "null"] },
+    "staged": { "type": ["string", "null"] },
+    "sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "old_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "backup_path": { "type": ["string", "null"] },
+    "trash_path": { "type": ["string", "null"] },
+    "size": { "type": ["integer", "null"], "minimum": 0 },
+    "message": { "type": "string" }
+  }
+}
