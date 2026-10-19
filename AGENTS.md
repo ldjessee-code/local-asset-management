@@ -14,7 +14,8 @@ product. The browser is a remote control, not the hasher.
   A map file-size cap is generic (job kind `map`, default 100000000 bytes),
   not a VTT-named rule. Recycle (Recycle Bin) exists on `lam actions` with
   `--apply`, on `lam oversize scan --apply` only after a zip of that original
-  verifies, and on `lam place --replace` and `lam stage clean --apply`.
+  verifies, on `lam place --replace`, on `lam stage clean --apply`, and on
+  single-file `lam place STAGED DEST` only after the new dest sha verifies.
 - **Do not** put hashing or copies in JavaScript/WASM.
 
 ## Safety (writes)
@@ -126,14 +127,30 @@ Field reference, combined/parts rules, and exit codes: `docs/oversize.md`.
 
 ### Court staging (`lam-stage-job/v1`, `lam-place-manifest/v1`)
 
-`lam stage new` creates a job outside Dropbox. `lam place` copies `out\`
+`lam stage new` creates a job outside Dropbox. `lam place JOBDIR` copies `out\`
 into the target (never moves). `lam publish` copies one live file the same
 way. `lam stage clean` recycles old payload after a verified place.
 Kind `map` caps a file at 100000000 bytes and reuses `lam/oversize` for the
 stand-in and the zip. `lam oversize scan` is unchanged (bytes or pixels).
 
+Single-file form (stdout schema `place/v1`, `tool` `lam`): `lam stage FILE [--root ROOT] [--json]`
+copies that file to `<root>\single\<sha256>\<name>` and prints status `staged` with dest null.
+`lam place STAGED DEST` requires exactly one of `--expect-sha256 HEX` or `--new` (neither or both is
+exit 2). Bad hex and a missing staged file are exit 1 `refused`, not usage. `--new` onto an existing
+dest is status `conflict` (`conflict: dest exists`). A dest hash that does not match is status
+`sha-mismatch` (`sha-mismatch: dest hash does not match`). Order: backup of the old dest, rename it
+to `<dest>.~place.old`, copy via temp plus rename, verify the dest sha equals the staged sha, and
+only then recycle the hold file. Recycle failure is exit 1 and keeps the new dest. Exit 1 does not
+promise dest is unchanged. `--dry-run` writes nothing. `--backup-dir` chooses the backup folder.
+The backup name is `<dest.name>.<oldsha>.bak` (then `.2.bak` through `.999.bak` on collision, no
+timestamp). `--root` on stage is the staging root. On place, `--root` requires the staged file
+under that root and does not choose dest. `--grant` requires the dest under that prefix. Exit codes:
+0 ok, 1 refused, conflict, sha-mismatch, or failed, 2 usage only. `lam place JOBDIR --replace` is unchanged
+and still recycles before the copy. It is not the single-file contract.
+
 - Job: `lam/schemas/lam-stage-job.v1.schema.json` (`lam-stage-job/v1`)
 - Manifest: `lam/schemas/lam-place-manifest.v1.schema.json` (`lam-place-manifest/v1`)
+- Single-file result: `lam/schemas/place.v1.schema.json` (`place/v1`)
 
 Field reference and exit codes: `docs/staging.md`. Samples under `C:\Example`:
 `examples/stage-job.sample.json`, `examples/place-manifest.sample.json`.
@@ -235,6 +252,7 @@ Recycle Bin, and `court-run.ps1`.
 | `publish` copy, skip, dry-run, undo CSV | `tests/stage/test_publish.py` |
 | Doorbell PASS/FAIL argv, no ring on dry-run or exit 2 | `tests/stage/test_doorbell.py` |
 | `lam-stage-job/v1` and `lam-place-manifest/v1` in the registry, capabilities, this file, and `docs/staging.md` | `tests/stage/test_capabilities.py`, `tests/stage/test_docs.py` |
+| Single-file `lam stage FILE` / `lam place STAGED DEST` prints `place/v1`: each status and message, exit 1 for refused/conflict/sha-mismatch/failed, exit 2 usage only, sha and size rules, backup name, recycle failure keeps the new dest | `tests/stage/test_single_place.py` |
 
 ## Proof (pack / unpack)
 

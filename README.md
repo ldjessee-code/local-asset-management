@@ -265,6 +265,32 @@ for one live file (undo CSV `<dest>.publish-undo.csv`).
 payload 14 days, then those folders go to the Recycle Bin. Failed and
 unplaced jobs are kept and flagged stale after 30 days.
 
+Single-file place uses the same recycle path and a different command shape.
+`lam stage FILE [--root ROOT] [--json]` copies one file under the staging
+root and prints `place/v1` (`tool` is `lam`, status `staged`, dest null).
+`lam place STAGED DEST` needs `--expect-sha256 HEX` or `--new` (not both;
+omitting both is exit 2). A bad hex string and a missing staged file are
+exit 1 `refused`, not usage. `--new` onto an existing dest is
+`conflict: dest exists`. A dest hash that does not match is
+`sha-mismatch: dest hash does not match`. On a match, lam writes a backup,
+renames the old dest to `<dest>.~place.old`, copies with a temp name and
+rename, checks the dest sha against the staged sha, and only then sends the
+old file to the Recycle Bin. Recycle failure is exit 1 and keeps the new
+dest. Exit 1 does not by itself mean dest is unchanged. `--dry-run` writes
+nothing. The backup name is `<dest.name>.<oldsha>.bak` in the dest folder,
+or in `--backup-dir`, then `<dest.name>.<oldsha>.2.bak` through `.999.bak`
+when that name is taken. There is no timestamp. `--root` on stage is the
+staging root. On place, `--root` only requires the staged file to sit under
+that root. `--grant` requires dest under that prefix. Exit codes are 0 ok,
+1 for refused, conflict, sha-mismatch, or failed, and 2 for usage only. Job
+`lam place JOBDIR --replace` still recycles before the copy.
+
+```text
+lam stage D:\work\note.md --root C:\CourtStaging --json
+lam place C:\CourtStaging\single\SHA\note.md D:\lore\note.md --new --json
+lam place C:\CourtStaging\single\SHA\note.md D:\lore\note.md --expect-sha256 OLDSHA --backup-dir D:\lore-backups --json
+```
+
 Details: [docs/staging.md](docs/staging.md).
 
 ```text
