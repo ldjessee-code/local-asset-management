@@ -36,9 +36,11 @@ page, writes one central register (`lam-oversize-register/v1`), and on
 Bin. See [oversize.md](oversize.md).
 
 `lam stage`, `lam place`, and `lam publish` (`lam.stage`) are not part of
-scan → report → plan → apply. A job lives outside Dropbox
+scan, report, plan, and apply. A job lives outside Dropbox
 (`lam-stage-job/v1`). `lam place` copies finished files into the target and
-records them in `lam-place-manifest/v1`. Kind `map` uses a 100000000 byte
+records them in `lam-place-manifest/v1`. Single-file `lam stage FILE` and
+`lam place STAGED DEST` print `lam-place/v1` and recycle the old file only
+after the new sha verifies. Kind `map` uses a 100000000 byte
 cap. See [staging.md](staging.md).
 
 `lam pack` and `lam unpack` (`lam.archive`) build or extract a zip or

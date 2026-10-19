@@ -265,6 +265,24 @@ for one live file (undo CSV `<dest>.publish-undo.csv`).
 payload 14 days, then those folders go to the Recycle Bin. Failed and
 unplaced jobs are kept and flagged stale after 30 days.
 
+Single-file place uses the same recycle path and a different command shape.
+`lam stage FILE [--root ROOT] [--json]` copies one file under the staging
+root and can print `lam-place/v1`. `lam place STAGED DEST` needs
+`--expect-sha256 HEX` or `--new` (not both; omitting both is a usage error).
+A sha mismatch is refused and the dest is left untouched. `--new` is refused
+when the dest already exists. On a match, lam writes a backup, copies with
+a temp name and rename, checks the dest sha against the staged sha, and only
+then sends the old file to the Recycle Bin. `--dry-run` writes nothing.
+`--backup-dir` sets the backup folder. `--root` and `--grant` are path
+guards. Exit codes are 0 ok, 1 refused or failed, and 2 usage. Job
+`lam place JOBDIR --replace` still recycles before the copy.
+
+```text
+lam stage D:\work\note.md --root C:\CourtStaging --json
+lam place C:\CourtStaging\single\SHA\note.md D:\lore\note.md --new --json
+lam place C:\CourtStaging\single\SHA\note.md D:\lore\note.md --expect-sha256 OLDSHA --backup-dir D:\lore-backups --json
+```
+
 Details: [docs/staging.md](docs/staging.md).
 
 ```text

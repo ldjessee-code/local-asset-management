@@ -126,6 +126,53 @@ This reuses `write_standin_under_bytes` and `write_verified_zip` in
 `lam/oversize`. `lam oversize scan` is unchanged: it is still "bytes or
 pixels", and its proxy is still an 8000 px long side.
 
+## Single-file `lam stage FILE` and `lam place STAGED DEST`
+
+```text
+lam stage FILE [--root ROOT] [--json]
+lam place STAGED DEST (--expect-sha256 HEX | --new) [--dry-run] [--backup-dir DIR] [--root ROOT] [--grant PREFIX] [--json]
+```
+
+This form sits beside `stage new` / `stage clean` and beside `place JOBDIR`.
+A bare path uses the file form. `new` and `clean` stay the job commands.
+`place` with one path is still the job. `place` with two paths is the file.
+Pass `--replace` only on the job form. That flag still recycles before the
+copy. The file form does not take it.
+
+`lam stage FILE` copies the file to `<root>\single\<sha256>\<name>`. It does
+not move or delete the source. `--json` prints one `lam-place/v1` object.
+Without `--json` it prints the staged path.
+
+`lam place` requires exactly one of `--expect-sha256` and `--new`. Neither
+or both exits 2. `--expect-sha256` is 64 hex characters. The check is
+case-insensitive.
+
+| Case | Result |
+|---|---|
+| `--new` and dest missing | Copy, verify, no backup, no recycle. Exit 0 |
+| `--new` and dest exists | Exit 1. Dest untouched |
+| `--expect-sha256` matches | Backup, copy, verify, then recycle the old file. Exit 0 |
+| `--expect-sha256` does not match | Exit 1. Dest untouched. No backup |
+| Dest missing with `--expect-sha256` | Exit 1 |
+| `--dry-run` | Exit 0 when the check would pass. Writes nothing |
+| Bad `--root` or `--grant`, or dest outside them | Exit 1 |
+
+Write order when the old sha matches:
+
+1. Copy the old dest to the backup. Default folder is the dest folder. `--backup-dir` overrides it. The name is `<dest.name>.<oldsha>.bak`. The backup is kept.
+2. Rename the old dest to `<dest>.~place.old` so those bytes still exist as a file.
+3. Copy the staged file to dest through `<dest>.~place.tmp` and `os.replace`.
+4. SHA-256 the dest. It must equal the staged sha.
+5. Only then send `<dest>.~place.old` through `lam.actions.recycle_path` (send2trash, or on Windows `SHFileOperationW` with the undo flag). `trash_path` is null because that call does not return the Recycle Bin location.
+
+If step 4 fails, dest is restored from `<dest>.~place.old` and nothing is recycled. The backup from step 1 is left in place. If step 5 fails, the new dest stays, the backup stays, and `<dest>.~place.old` stays. Exit 1. The JSON `sha256` is the dest sha on disk.
+
+`lam-place/v1` fields: `schema`, `status`, `dest`, `staged`, `sha256`, `old_sha256`, `backup_path`, `trash_path`, `size`, `message`. `sha256` on success is the final dest sha. On a dry run it is the staged sha (nothing was written).
+
+`--root` on `stage` is the staging root (same Dropbox, OneDrive, and `C:\Example` refusal as `stage new`, exit 1). On `place`, the staged file must be under `--root`. `--grant` requires dest under that prefix. Dest is also refused under `C:\Example` or `.git`.
+
+Exit codes for this form: 0 ok, 1 refused or failed, 2 usage.
+
 ## `lam publish`
 
 ```text

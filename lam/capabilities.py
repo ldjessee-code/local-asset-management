@@ -24,6 +24,8 @@ from lam.schemas.registry import (
     OVERSIZE_SCHEMAS,
     PLACE_MANIFEST_SCHEMA_ID,
     PLACE_MANIFEST_SCHEMAS,
+    PLACE_RESULT_SCHEMA_ID,
+    PLACE_RESULT_SCHEMAS,
     STAGE_JOB_SCHEMA_ID,
     STAGE_JOB_SCHEMAS,
     TAG_REVIEW_SCHEMAS,
@@ -146,8 +148,9 @@ COMMANDS: tuple[dict[str, Any], ...] = (
         "config_required": False,
         "writes": True,
         "summary": (
-            "Create a staging job outside Dropbox (lam stage new) or recycle "
-            "expired payload after a verified place (lam stage clean, dry-run default)."
+            "Create a staging job outside Dropbox (lam stage new), recycle "
+            "expired payload (lam stage clean, dry-run default), or copy one "
+            "file (lam stage FILE [--root ROOT] [--json])."
         ),
         "function": "lam.stage.cli.run_stage_command",
     },
@@ -156,9 +159,11 @@ COMMANDS: tuple[dict[str, Any], ...] = (
         "config_required": False,
         "writes": True,
         "summary": (
-            "Copy a staging out folder into its target. Temp file, rename retry, "
-            "SHA-256 check. --dry-run writes nothing. Map kind caps files at "
-            "100000000 bytes."
+            "Copy a staging out folder into its target, or one staged file "
+            "(lam place STAGED DEST --expect-sha256 HEX | --new). Temp file, "
+            "rename, SHA-256 check, then recycle the old file. --dry-run writes "
+            "nothing. Job --replace still recycles before the copy. Map kind "
+            "caps files at 100000000 bytes."
         ),
         "function": "lam.stage.cli.run_place_command",
     },
@@ -376,8 +381,10 @@ def describe_capabilities() -> dict[str, Any]:
             "schema_registry": "lam/schemas/registry.py",
             "job_schema": STAGE_JOB_SCHEMA_ID,
             "manifest_schema": PLACE_MANIFEST_SCHEMA_ID,
+            "place_schema": PLACE_RESULT_SCHEMA_ID,
             "job_schema_ids": status_groups(STAGE_JOB_SCHEMAS),
             "manifest_schema_ids": status_groups(PLACE_MANIFEST_SCHEMAS),
+            "place_schema_ids": status_groups(PLACE_RESULT_SCHEMAS),
             "map_byte_cap": 100000000,
             "dry_run_place": True,
             "clean_dry_run_default": True,
@@ -484,8 +491,10 @@ def format_capabilities_text(data: dict[str, Any] | None = None) -> str:
     lines += ["", "Staging schemas:"]
     lines.append("  job supported: " + ", ".join(staging["job_schema_ids"]["supported"]))
     lines.append("  manifest supported: " + ", ".join(staging["manifest_schema_ids"]["supported"]))
+    lines.append("  place result supported: " + ", ".join(staging["place_schema_ids"]["supported"]))
     lines.append(f"  {STAGE_JOB_SCHEMA_ID}")
     lines.append(f"  {PLACE_MANIFEST_SCHEMA_ID}")
+    lines.append(f"  {PLACE_RESULT_SCHEMA_ID}")
     archive = cap.get("archive")
     if archive:
         lines += ["", "Archive:"]
