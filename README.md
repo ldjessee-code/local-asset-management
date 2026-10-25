@@ -249,8 +249,8 @@ lam oversize list --csv oversize.csv
 
 Downloads are finished outside Dropbox. `lam stage new` creates
 `<root>\<owner>\<job>_timestamp\{in,work,out,logs}` and a `lam-stage-job/v1`
-file. The root defaults to `C:\CourtStaging` when that drive exists, else
-`F:\CourtStaging`, and is refused inside Dropbox or OneDrive.
+file. The root defaults to `F:\CourtStaging` (one subfolder per owner, for
+example `F:\CourtStaging\Ark`), and is refused inside Dropbox or OneDrive.
 
 `lam place <jobdir>` copies `out\` into the job target. It writes
 `<dest>.~place.tmp`, renames with a lock retry, and checks the SHA-256.
@@ -286,17 +286,17 @@ that root. `--grant` requires dest under that prefix. Exit codes are 0 ok,
 `lam place JOBDIR --replace` still recycles before the copy.
 
 ```text
-lam stage D:\work\note.md --root C:\CourtStaging --json
-lam place C:\CourtStaging\single\SHA\note.md D:\lore\note.md --new --json
-lam place C:\CourtStaging\single\SHA\note.md D:\lore\note.md --expect-sha256 OLDSHA --backup-dir D:\lore-backups --json
+lam stage D:\work\note.md --root F:\CourtStaging --json
+lam place F:\CourtStaging\single\SHA\note.md D:\lore\note.md --new --json
+lam place F:\CourtStaging\single\SHA\note.md D:\lore\note.md --expect-sha256 OLDSHA --backup-dir D:\lore-backups --json
 ```
 
 Details: [docs/staging.md](docs/staging.md).
 
 ```text
 lam stage new --owner notLib --job maps --target D:\Dropbox\Gaming\Maps --kind map
-lam place C:\CourtStaging\notLib\maps_20261016_1200 --dry-run
-lam place C:\CourtStaging\notLib\maps_20261016_1200 --jobs-dir D:\jobs\maps
+lam place F:\CourtStaging\notLib\maps_20261016_1200 --dry-run
+lam place F:\CourtStaging\notLib\maps_20261016_1200 --jobs-dir D:\jobs\maps
 lam publish tracker.csv D:\Dropbox\TheCourt\tracker.csv
 lam stage clean --apply
 ```

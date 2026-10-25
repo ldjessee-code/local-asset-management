@@ -242,7 +242,7 @@ Recycle Bin, and `court-run.ps1`.
 | Claim | Where |
 |---|---|
 | `stage new` layout, schema, clock, clash, unsafe names, Dropbox and OneDrive refusal | `tests/stage/test_new.py`, `tests/stage/test_paths.py` |
-| Default root prefers `C:\\CourtStaging` then `F:\\CourtStaging` and does not create them | `tests/stage/test_paths.py` |
+| Default root is `F:\\CourtStaging` and does not create it | `tests/stage/test_paths.py` |
 | Manifest match, extra file, hash mismatch, unknown schema | `tests/stage/test_manifest.py`, `tests/stage/test_exit.py` |
 | Copy, temp name, rename retry, verify, undo CSV | `tests/stage/test_place.py`, `tests/stage/test_copy.py` |
 | Dup skip, conflict stop, suffix, recycle replace, dry-run | `tests/stage/test_conflicts.py` |
