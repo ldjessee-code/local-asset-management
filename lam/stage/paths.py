@@ -14,8 +14,7 @@ from lam.stage.errors import StageError
 from lam.token.paths import dropbox_root, is_example_path, is_same_or_under
 
 MAP_BYTE_CAP = 100_000_000
-PREFERRED_ROOT = Path(r"C:\CourtStaging")
-FALLBACK_ROOT = Path(r"F:\CourtStaging")
+DEFAULT_ROOT = Path(r"F:\CourtStaging")
 HARD_DROPBOX = Path(r"F:\Dropbox")
 ILLEGAL = set('<>:"/\\|?*')
 RESERVED = {"CON", "PRN", "AUX", "NUL"}
@@ -24,22 +23,15 @@ RESERVED.update(f"LPT{n}" for n in range(1, 10))
 ONEDRIVE_ENVS = ("OneDrive", "OneDriveConsumer", "OneDriveCommercial")
 
 
-def drive_exists(drive: str) -> bool:
-    """True when ``drive`` (like ``C:``) has a root directory."""
-    return Path(drive + "\\").exists()
-
-
 def default_staging_root() -> Path:
-    """``LAM_STAGING_ROOT``, else ``C:\\CourtStaging`` when that drive exists, else ``F:\\CourtStaging``.
+    """``LAM_STAGING_ROOT`` when set, otherwise ``F:\\CourtStaging``.
 
-    This does not create either directory.
+    This does not create the directory.
     """
     raw = os.environ.get("LAM_STAGING_ROOT")
     if raw:
         return Path(raw)
-    if PREFERRED_ROOT.drive and drive_exists(PREFERRED_ROOT.drive):
-        return PREFERRED_ROOT
-    return FALLBACK_ROOT
+    return DEFAULT_ROOT
 
 
 def default_jobs_dir(job: str) -> Path:

@@ -9,23 +9,42 @@ import pytest
 
 from lam.stage.errors import StageError
 from lam.stage.job import create_job
-from lam.stage.paths import FALLBACK_ROOT, MAP_BYTE_CAP, PREFERRED_ROOT, default_staging_root
+from lam.stage.paths import DEFAULT_ROOT, MAP_BYTE_CAP, default_staging_root
 
 
 def test_map_cap_is_decimal_100_million():
     assert MAP_BYTE_CAP == 100_000_000
 
 
-def test_default_root_prefers_c_when_drive_exists(monkeypatch: pytest.MonkeyPatch):
+def test_default_root_is_f_when_env_unset(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("LAM_STAGING_ROOT", raising=False)
-    monkeypatch.setattr("lam.stage.paths.drive_exists", lambda drive: drive.upper().startswith("C"))
-    assert default_staging_root() == PREFERRED_ROOT
+    assert DEFAULT_ROOT == Path(r"F:\CourtStaging")
+    before = DEFAULT_ROOT.exists()
+    assert default_staging_root() == DEFAULT_ROOT
+    assert DEFAULT_ROOT.exists() is before
 
 
-def test_default_root_falls_back_when_drive_missing(monkeypatch: pytest.MonkeyPatch):
+def test_lam_staging_root_overrides_and_does_not_create(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    custom = tmp_path / "from-env"
+    monkeypatch.setenv("LAM_STAGING_ROOT", str(custom))
+    assert default_staging_root() == custom
+    assert custom.exists() is False
+
+
+def test_ark_job_lands_under_owner_on_default_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.delenv("LAM_STAGING_ROOT", raising=False)
-    monkeypatch.setattr("lam.stage.paths.drive_exists", lambda _drive: False)
-    assert default_staging_root() == FALLBACK_ROOT
+    created = create_job(
+        owner="Ark",
+        job="maps",
+        target=tmp_path / "target",
+        root=tmp_path / "stage",
+    )
+    assert created.parent == (tmp_path / "stage" / "Ark")
+    assert default_staging_root() / "Ark" == DEFAULT_ROOT / "Ark"
 
 
 def test_dropbox_root_refused_and_sibling_allowed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

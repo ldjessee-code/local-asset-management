@@ -17,8 +17,9 @@ Root resolution:
 
 1. `--root` if you passed it.
 2. Else `LAM_STAGING_ROOT`.
-3. Else `C:\CourtStaging` when that drive exists.
-4. Else `F:\CourtStaging`.
+3. Else `F:\CourtStaging`.
+
+Each owner is one subfolder of that root, for example `F:\CourtStaging\Ark`.
 
 The root is refused when it is inside Dropbox (`LAM_DROPBOX_ROOT` or
 `F:\Dropbox`), inside OneDrive (`OneDrive`, `OneDriveConsumer`,
@@ -153,8 +154,7 @@ is the staged file sha, `size` is that file's size, and `message` is
 
 On `lam stage` (`FILE`, `new`, and `clean`), `--root` is the staging root.
 Omitted, the root is `LAM_STAGING_ROOT` when that environment variable is
-set, otherwise `C:\CourtStaging` when the `C:` drive exists, otherwise
-`F:\CourtStaging`. That lookup does not create either directory.
+set, otherwise `F:\CourtStaging`. That lookup does not create the directory.
 `lam stage FILE` creates `<root>\single\<sha256>\` and copies the file
 there. The root is refused when it is inside Dropbox (`LAM_DROPBOX_ROOT`,
 or `F:\Dropbox`), inside OneDrive (the `OneDrive`, `OneDriveConsumer`, or

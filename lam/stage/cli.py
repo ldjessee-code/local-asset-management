@@ -44,7 +44,7 @@ def add_stage_parser(subparsers) -> None:
     stage.add_argument("--owner", default=None, help="stage new: path segment for the owner")
     stage.add_argument("--job", default=None, help="stage new: path segment for the job name")
     stage.add_argument("--target", default=None, help="stage new: folder place will copy into")
-    stage.add_argument("--root", default=None, help="Staging root. Default: C:\\CourtStaging, else F:\\CourtStaging")
+    stage.add_argument("--root", default=None, help="Staging root. Default: F:\\CourtStaging")
     stage.add_argument("--plan", default=None, help="stage new: optional plan path stored on the job")
     stage.add_argument("--kind", choices=KINDS, default=None, help="stage new: naming pattern. map uses a 100000000 byte cap")
     stage.add_argument("--byte-cap", type=int, default=None, help="stage new: override the file-size cap in bytes")
